@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Planeador Luis & Marlin Pro - Organizador de Viajes y Presupuestos en la Nube</title>
 
   <!-- Tailwind CSS -->
@@ -68,36 +71,95 @@
   <div id="root"></div>
 
   <script type="text/javascript">
-    const CLOUD_STORAGE_KEY = "planeador_luis_marlin_cloud_v3";
-    const CLOUD_ENDPOINT = `https://kvdb.io/6W3s1v9Y8pQz2x4M7k/${CLOUD_STORAGE_KEY}`;
+    const DEFAULT_SYNC_ROOM = "LUIS-MARLIN-2026";
 
     window.CloudEngine = {
-      async fetchCloudTrips() {
+      getRoomId() {
         try {
-          const response = await fetch(CLOUD_ENDPOINT, { method: 'GET', cache: 'no-store' });
+          return localStorage.getItem("planner_sync_room") || DEFAULT_SYNC_ROOM;
+        } catch (e) {
+          return DEFAULT_SYNC_ROOM;
+        }
+      },
+      setRoomId(roomId) {
+        try {
+          const cleanRoom = (roomId || DEFAULT_SYNC_ROOM).toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '');
+          localStorage.setItem("planner_sync_room", cleanRoom || DEFAULT_SYNC_ROOM);
+          return cleanRoom || DEFAULT_SYNC_ROOM;
+        } catch (e) {
+          return DEFAULT_SYNC_ROOM;
+        }
+      },
+      async fetchCloudTrips(customRoom) {
+        const room = customRoom || this.getRoomId();
+        const timestamp = Date.now();
+        
+        // 1. Primario: Firebase RTDB REST API
+        try {
+          const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json?_t=${timestamp}`;
+          const response = await fetch(fbUrl, { cache: 'no-store' });
           if (response.ok) {
             const data = await response.json();
-            if (Array.isArray(data) && data.length > 0) {
-              return data;
+            if (data && Array.isArray(data.trips) && data.trips.length > 0) {
+              return data.trips;
             }
           }
         } catch (e) {
-          console.warn("Cloud fetch:", e);
+          console.warn("Firebase Cloud fetch error:", e);
         }
+
+        // 2. Secundario: KVDB Backup
+        try {
+          const kvUrl = `https://kvdb.io/6W3s1v9Y8pQz2x4M7k/${room}?_t=${timestamp}`;
+          const response2 = await fetch(kvUrl, { cache: 'no-store' });
+          if (response2.ok) {
+            const data2 = await response2.json();
+            if (Array.isArray(data2) && data2.length > 0) return data2;
+            if (data2 && Array.isArray(data2.trips) && data2.trips.length > 0) return data2.trips;
+          }
+        } catch (e) {
+          console.warn("KVDB Cloud fetch error:", e);
+        }
+
         return null;
       },
-      async pushCloudTrips(tripsData) {
+      async pushCloudTrips(tripsData, customRoom) {
+        const room = customRoom || this.getRoomId();
+        let success = false;
+
+        const payload = {
+          trips: tripsData,
+          updatedAt: new Date().toISOString(),
+          device: navigator.userAgent
+        };
+
+        // 1. Primario: Firebase RTDB REST API
         try {
-          await fetch(CLOUD_ENDPOINT, {
+          const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json`;
+          const fbRes = await fetch(fbUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (fbRes.ok) success = true;
+        } catch (e) {
+          console.warn("Firebase Cloud push error:", e);
+        }
+
+        // 2. Secundario: KVDB Backup
+        try {
+          const kvUrl = `https://kvdb.io/6W3s1v9Y8pQz2x4M7k/${room}`;
+          await fetch(kvUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(tripsData)
+            body: JSON.stringify(payload)
           });
-          return true;
+          success = true;
         } catch (e) {
-          console.warn("Cloud push:", e);
-          return false;
+          console.warn("KVDB Cloud push error:", e);
         }
+
+        return success;
       }
     };
   </script>
@@ -105,7 +167,7 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // Componentes de Íconos SVG integrados
+    // Componentes de Íconos SVG
     const IconPlus = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     );
@@ -151,16 +213,22 @@
     const IconCheckCircle = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
     );
-    const IconRefresh = ({ className = "w-4 h-4" }) => (
-      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+    const IconCloudUpload = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+    );
+    const IconCloudDownload = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 21v-9"/><path d="m8 17 4 4 4-4"/></svg>
+    );
+    const IconKey = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3"/></svg>
     );
 
     const PRESET_COVERS = [
+      { name: "Perú & Machu Picchu", url: "https://images.unsplash.com/photo-1526392060635-9d6019884377?q=80&w=1200&auto=format&fit=crop" },
       { name: "Nueva York & Punta Cana", url: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1200&auto=format&fit=crop" },
       { name: "Japón (Tokio / Kioto)", url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1200&auto=format&fit=crop" },
       { name: "China (Muralla / Shanghai)", url: "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?q=80&w=1200&auto=format&fit=crop" },
-      { name: "Europa (París / Roma)", url: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1200&auto=format&fit=crop" },
-      { name: "Caribe & Playa", url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200&auto=format&fit=crop" }
+      { name: "Europa (París / Roma)", url: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1200&auto=format&fit=crop" }
     ];
 
     const CATEGORIES = [
@@ -181,6 +249,30 @@
     ];
 
     const INITIAL_TRIPS = [
+      {
+        id: 'trip-peru-magico-2027',
+        title: 'Perú Mágico',
+        subtitle: 'Cusco, Machu Picchu y Valle Sagrado',
+        startDate: '2027-04-04',
+        endDate: '2027-04-12',
+        currency: 'COP',
+        targetBudget: 10000000,
+        coverImage: 'https://images.unsplash.com/photo-1526392060635-9d6019884377?q=80&w=1200&auto=format&fit=crop',
+        notes: 'Viaje a Perú. Llevar abrigo para Cusco y boletos de ingreso a Machu Picchu reservados.',
+        flights: [
+          { id: 'f-peru-1', company: 'LATAM Airlines', route: 'Bogotá -> Lima -> Cusco', date: '2027-04-04', cost: 2450000, bookingRef: 'LA-7721', notes: 'Incluye equipaje de mano y bodega' }
+        ],
+        stays: [
+          { id: 's-peru-1', name: 'Hotel Boutique Cusco Plaza', city: 'Cusco', checkIn: '2027-04-04', checkOut: '2027-04-10', cost: 3200000, confirmCode: 'CUZ-8812', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop' }
+        ],
+        activities: [
+          { id: 'a-peru-1', day: 'Día 3 - Cusco', city: 'Machu Picchu', title: 'Entrada Ciudadela + Tren Expedition', cost: 1800000, photo: 'https://images.unsplash.com/photo-1526392060635-9d6019884377?q=80&w=600&auto=format&fit=crop', notes: 'Horario de ingreso 08:00 AM' }
+        ],
+        expenses: [
+          { id: 'e-peru-1', title: 'Boleto Turístico del Cusco', category: 'actividades', cost: 450000, date: '2027-04-05' },
+          { id: 'e-peru-2', title: 'Restaurantes & Gastronomía Peruana', category: 'comidas', cost: 850000, date: '2027-04-06' }
+        ]
+      },
       {
         id: 'trip-ny-puntacana-2026',
         title: 'New York - Punta Cana',
@@ -233,6 +325,8 @@
     }
 
     function App() {
+      const [syncRoom, setSyncRoom] = useState(() => window.CloudEngine.getRoomId());
+      
       const [trips, setTrips] = useState(() => {
         try {
           const saved = localStorage.getItem('travelplanner_trips');
@@ -253,6 +347,7 @@
       const [showFlightModal, setShowFlightModal] = useState(false);
       const [showStayModal, setShowStayModal] = useState(false);
       const [showAiModal, setShowAiModal] = useState(false);
+      const [showRoomModal, setShowRoomModal] = useState(false);
       const [toastMessage, setToastMessage] = useState('');
 
       // Estados del Asistente IA Dual
@@ -268,7 +363,7 @@
         let isMounted = true;
 
         const loadFromCloud = async () => {
-          const cloudData = await window.CloudEngine.fetchCloudTrips();
+          const cloudData = await window.CloudEngine.fetchCloudTrips(syncRoom);
           if (isMounted && cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
             setTrips(cloudData);
             setSyncStatus('online');
@@ -282,13 +377,13 @@
 
         const syncInterval = setInterval(() => {
           loadFromCloud();
-        }, 5000);
+        }, 4000);
 
         return () => {
           isMounted = false;
           clearInterval(syncInterval);
         };
-      }, []);
+      }, [syncRoom]);
 
       useEffect(() => {
         try {
@@ -299,7 +394,7 @@
       const saveAndUpdateTrips = async (newList) => {
         setTrips(newList);
         setSyncStatus('syncing');
-        const success = await window.CloudEngine.pushCloudTrips(newList);
+        const success = await window.CloudEngine.pushCloudTrips(newList, syncRoom);
         setSyncStatus('online');
       };
 
@@ -308,15 +403,24 @@
         setTimeout(() => setToastMessage(''), 3500);
       };
 
-      const forceCloudSync = async () => {
+      const forceCloudUpload = async () => {
         setSyncStatus('syncing');
-        const cloudData = await window.CloudEngine.fetchCloudTrips();
+        await window.CloudEngine.pushCloudTrips(trips, syncRoom);
+        setSyncStatus('online');
+        showToast(`✅ ¡Viajes subidos a la Nube en la Sala ${syncRoom}!`);
+      };
+
+      const forceCloudDownload = async () => {
+        setSyncStatus('syncing');
+        const cloudData = await window.CloudEngine.fetchCloudTrips(syncRoom);
         if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
           setTrips(cloudData);
-          showToast("Datos sincronizados desde la nube.");
+          if (!activeTripId || !cloudData.find(t => t.id === activeTripId)) {
+            setActiveTripId(cloudData[0].id);
+          }
+          showToast(`📥 Datos cargados desde la Nube (Sala: ${syncRoom}).`);
         } else {
-          await window.CloudEngine.pushCloudTrips(trips);
-          showToast("Sincronización en la nube actualizada.");
+          showToast(`⚠️ No hay datos en la Nube para la sala ${syncRoom}. Revisa la clave.`);
         }
         setSyncStatus('online');
       };
@@ -410,7 +514,6 @@
         const promptText = aiQuery;
         let generatedProposal = null;
 
-        // Si se proporciona una API Key, intentamos con la API de Gemini 3 Flash
         if (aiApiKey.trim()) {
           try {
             const systemPrompt = "Eres un agente experto en viajes internacionales. Proporciona itinerarios y estimaciones de costos detalladas en español.";
@@ -447,33 +550,36 @@
               }
             }
           } catch (err) {
-            console.warn("API de Gemini no respondió, cambiando al motor inteligente local:", err);
+            console.warn("API de Gemini no respondió, cambiando a motor cuantitativo local:", err);
           }
         }
 
-        // Si no hay API key o si la API falló, el Motor Inteligente genera la estimación detallada
         if (!generatedProposal) {
           const lowerQ = promptText.toLowerCase();
           let destination = promptText;
           let budgetEst = 16000000;
           let coverImg = PRESET_COVERS[0].url;
 
-          if (lowerQ.includes('japón') || lowerQ.includes('tokio') || lowerQ.includes('asia')) {
+          if (lowerQ.includes('perú') || lowerQ.includes('cusco') || lowerQ.includes('machu')) {
+            destination = 'Perú Mágico (Cusco & Machu Picchu)';
+            budgetEst = 10000000;
+            coverImg = PRESET_COVERS[0].url;
+          } else if (lowerQ.includes('japón') || lowerQ.includes('tokio') || lowerQ.includes('asia')) {
             destination = 'Japón (Tokio, Kioto y Osaka)';
             budgetEst = 22000000;
-            coverImg = PRESET_COVERS[1].url;
+            coverImg = PRESET_COVERS[2].url;
           } else if (lowerQ.includes('china') || lowerQ.includes('pekin')) {
             destination = 'China (Pekín y Shanghai)';
             budgetEst = 20000000;
-            coverImg = PRESET_COVERS[2].url;
+            coverImg = PRESET_COVERS[3].url;
           } else if (lowerQ.includes('europa') || lowerQ.includes('parís') || lowerQ.includes('roma')) {
             destination = 'Europa (París, Roma y Madrid)';
             budgetEst = 24000000;
-            coverImg = PRESET_COVERS[3].url;
-          } else if (lowerQ.includes('caribe') || lowerQ.includes('punta cana') || lowerQ.includes('cancún')) {
-            destination = 'Caribe & Resort All-Inclusive';
-            budgetEst = 12000000;
             coverImg = PRESET_COVERS[4].url;
+          } else if (lowerQ.includes('new york') || lowerQ.includes('punta cana') || lowerQ.includes('caribe')) {
+            destination = 'New York & Punta Cana';
+            budgetEst = 18000000;
+            coverImg = PRESET_COVERS[1].url;
           }
 
           const structuredText = `📍 **Estimación de Itinerario para:** ${destination}
@@ -486,7 +592,7 @@
 
 🎯 **Actividades Recomendadas:**
 • Excursión con guía local y entradas a atracciones ($1,200,000 COP)
-• pases de transporte local ilimitado ($450,000 COP)
+• Pases de transporte local ilimitado ($450,000 COP)
 
 💰 **Presupuesto Total Estimado:** ${formatMoney(budgetEst, 'COP')}`;
 
@@ -535,13 +641,13 @@
         setShowAiModal(false);
         setAiResult(null);
         setAiQuery('');
-        showToast(`¡Viaje "${newTrip.title}" creado e importado desde la IA!`);
+        showToast(`¡Viaje "${newTrip.title}" creado e importado a la Nube!`);
       };
 
       return (
         <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans">
           
-          {/* Header Superior Adaptado */}
+          {}
           <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30 px-3 sm:px-6">
             <div className="max-w-7xl mx-auto h-16 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -557,32 +663,41 @@
               </div>
 
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-950 border border-slate-800 text-[10px] font-medium">
-                  {syncStatus === 'syncing' ? (
-                    <>
-                      <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping"></span>
-                      <span className="text-yellow-400 hidden sm:inline">Sincronizando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <span className="text-emerald-400 hidden sm:inline">Nube Sincronizada</span>
-                    </>
-                  )}
-                </div>
-
+                
+                {/* Botón de Clave de Sala de Sincronización */}
                 <button
-                  onClick={forceCloudSync}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-[10px] sm:text-xs font-semibold transition-all"
-                  title="Sincronizar Celular & PC"
+                  onClick={() => setShowRoomModal(true)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono hover:border-slate-700 transition-all"
+                  title="Cambiar o Vincular Sala de Nube"
                 >
-                  <IconRefresh className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Sincronizar</span>
+                  <IconKey className="w-3 h-3 text-cyan-400" />
+                  <span className="text-slate-400 hidden sm:inline">Sala:</span>
+                  <span className="text-emerald-400 font-bold">{syncRoom}</span>
+                </button>
+
+                {/* Subir a Nube (PC -> Nube) */}
+                <button
+                  onClick={forceCloudUpload}
+                  className="flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-[10px] sm:text-xs font-semibold transition-all"
+                  title="Subir viajes actuales de este equipo a la Nube"
+                >
+                  <IconCloudUpload className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Subir Nube</span>
+                </button>
+
+                {/* Descargar Nube (Nube -> Celular) */}
+                <button
+                  onClick={forceCloudDownload}
+                  className="flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 text-[10px] sm:text-xs font-semibold transition-all"
+                  title="Cargar viajes en vivo desde la Nube"
+                >
+                  <IconCloudDownload className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Bajar Nube</span>
                 </button>
 
                 <button
                   onClick={() => setShowAiModal(true)}
-                  className="flex items-center gap-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 text-cyan-300 border border-cyan-500/30 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-semibold transition-all"
+                  className="flex items-center gap-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-semibold transition-all"
                 >
                   <IconSparkles className="w-3.5 h-3.5 text-cyan-400" />
                   <span className="hidden sm:inline">Asistente</span> IA
@@ -786,7 +901,7 @@
                   </div>
                 </div>
 
-                {/* Tab Resumen */}
+                {}
                 {activeTab === 'resumen' && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-1 glass-panel p-5 rounded-3xl space-y-4">
@@ -875,7 +990,7 @@
                   </div>
                 )}
 
-                {/* Tab Cronograma */}
+                {}
                 {activeTab === 'cronograma' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1235,7 +1350,7 @@
                     <input
                       name="title"
                       required
-                      placeholder="Ej: New York - Punta Cana"
+                      placeholder="Ej: Perú Mágico / New York"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -1244,7 +1359,7 @@
                     <label className="text-slate-400 block mb-1 font-medium">Subtítulo / Ciudades</label>
                     <input
                       name="subtitle"
-                      placeholder="Ej: Manhattan y Punta Cana"
+                      placeholder="Ej: Cusco y Machu Picchu"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -1286,7 +1401,7 @@
                       <input
                         type="number"
                         name="targetBudget"
-                        placeholder="18000000"
+                        placeholder="10000000"
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none font-mono"
                       />
                     </div>
@@ -1353,6 +1468,55 @@
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Vinculación de Sala Nube */}
+          {showRoomModal && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+                    <IconKey className="w-5 h-5 text-emerald-400" />
+                    Vincular Dispositivos por Clave Nube
+                  </h3>
+                  <button onClick={() => setShowRoomModal(false)} className="text-slate-500 hover:text-slate-300">
+                    <IconX className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs text-slate-300">
+                  <p>
+                    Usa esta misma <strong>Clave de Sala</strong> en tu computador y celular para vincularlos en vivo:
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-slate-400 block font-medium">Clave de Sala Actual:</label>
+                    <input
+                      type="text"
+                      defaultValue={syncRoom}
+                      id="custom-room-input"
+                      className="w-full bg-slate-950 border border-emerald-500/50 rounded-xl p-3 text-emerald-400 font-mono font-bold text-sm tracking-wider focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex flex-col gap-2">
+                    <button
+                      onClick={async () => {
+                        const inputVal = document.getElementById('custom-room-input').value;
+                        const savedRoom = window.CloudEngine.setRoomId(inputVal);
+                        setSyncRoom(savedRoom);
+                        setShowRoomModal(false);
+                        showToast(`🔑 Sala cambiada a: ${savedRoom}`);
+                        await forceCloudDownload();
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
+                    >
+                      Guardar y Cargar Viajes de esta Sala
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1493,7 +1657,7 @@
                     <input
                       name="title"
                       required
-                      placeholder="Ej: Mirador SUMMIT One Vanderbilt"
+                      placeholder="Ej: Mirador SUMMIT / Machu Picchu"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -1511,7 +1675,7 @@
                       <label className="text-slate-400 block mb-1 font-medium">Ciudad</label>
                       <input
                         name="city"
-                        placeholder="Ej: Nueva York"
+                        placeholder="Ej: Cusco / Nueva York"
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none"
                       />
                     </div>
@@ -1611,20 +1775,20 @@
                 >
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Aerolínea / Compañía *</label>
-                    <input name="company" required placeholder="Ej: Avianca / LATAM" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                    <input name="company" required placeholder="Ej: LATAM / Avianca" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
                   </div>
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Ruta / Trayecto *</label>
-                    <input name="route" required placeholder="Ej: Bogotá -> New York (JFK)" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                    <input name="route" required placeholder="Ej: Bogotá -> Cusco" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Costo ({activeTrip.currency})</label>
-                      <input type="number" name="cost" placeholder="4500000" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400" />
+                      <input type="number" name="cost" placeholder="2450000" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400" />
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Código Reserva</label>
-                      <input name="bookingRef" placeholder="AV-9812" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                      <input name="bookingRef" placeholder="LA-7721" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
@@ -1673,11 +1837,11 @@
                 >
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Nombre Hotel / Ryokan *</label>
-                    <input name="name" required placeholder="Ej: Manhattan Hotel NYC" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                    <input name="name" required placeholder="Ej: Hotel Boutique Cusco" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
                   </div>
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Ciudad *</label>
-                    <input name="city" required placeholder="Ej: Nueva York" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                    <input name="city" required placeholder="Ej: Cusco" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -1692,7 +1856,7 @@
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Costo Total ({activeTrip.currency})</label>
-                      <input type="number" name="cost" placeholder="6800000" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400" />
+                      <input type="number" name="cost" placeholder="3200000" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400" />
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Foto del Hotel</label>
@@ -1725,7 +1889,7 @@
             </div>
           )}
 
-          {}
+          {/* Modal Asistente IA */}
           {showAiModal && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1751,7 +1915,7 @@
                         value={aiQuery}
                         onChange={(e) => setAiQuery(e.target.value)}
                         required
-                        placeholder="Ej: 15 días en New York y Punta Cana saliendo desde Bogotá"
+                        placeholder="Ej: 8 días en Perú o 15 días en New York"
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-100 focus:border-cyan-500 focus:outline-none"
                       />
                     </div>
@@ -1786,7 +1950,7 @@
                     </div>
                   </form>
 
-                  {/* Resultado de la IA con Importación en 1-Clic */}
+                  {/* Resultado de la IA */}
                   {aiResult && (
                     <div className="mt-4 p-4 rounded-2xl bg-slate-950 border border-cyan-500/40 space-y-3 animate-fadeIn">
                       <div className="flex items-center justify-between text-[11px] border-b border-slate-800 pb-2">
