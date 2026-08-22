@@ -2,8 +2,8 @@
 <html lang="es" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TravelPlanner Pro - Organizador de Viajes y Presupuestos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Planeador Luis & Marlin Pro - Organizador de Viajes y Presupuestos</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,7 +17,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   
-  <!-- Babel Standalone para transpilar JSX en el navegador sin bundling -->
+  <!-- Babel Standalone para transpilar JSX en el navegador -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
   <!-- Chart.js para gráficas financieras de gastos -->
@@ -28,10 +28,11 @@
       background-color: #090d16;
       color: #f3f4f6;
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
     }
     ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
     }
     ::-webkit-scrollbar-track {
       background: #0f172a;
@@ -41,12 +42,12 @@
       border-radius: 9999px;
     }
     .glass-panel {
-      background: rgba(15, 23, 42, 0.8);
+      background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
     .glass-card {
-      background: rgba(30, 41, 59, 0.6);
+      background: rgba(30, 41, 59, 0.65);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.05);
     }
@@ -55,16 +56,83 @@
     }
   </style>
 </head>
-<body class="bg-[#090d16] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-slate-950 min-h-screen">
+<body class="bg-[#090d16] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-slate-950 min-h-screen pb-12">
 
+  <!-- Contenedor principal de React -->
   <div id="root"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    window.initCloudSync = async function(onDataUpdate, onStatusChange) {
+      try {
+        if (typeof __firebase_config === 'undefined') {
+          onStatusChange && onStatusChange('local');
+          return null;
+        }
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'planeador-luis-marlin';
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Autenticación inicial
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+
+        if (!auth.currentUser) {
+          onStatusChange && onStatusChange('local');
+          return null;
+        }
+
+        onStatusChange && onStatusChange('online');
+
+        // Referencia a la colección en la nube
+        const tripsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'trips');
+
+        // Escuchar cambios en tiempo real entre dispositivos
+        const unsubscribe = onSnapshot(tripsCollectionRef, (snapshot) => {
+          const tripsData = [];
+          snapshot.forEach((docSnap) => {
+            tripsData.push(docSnap.data());
+          });
+          onDataUpdate(tripsData);
+        }, (error) => {
+          console.error("Cloud sync error:", error);
+          onStatusChange && onStatusChange('error');
+        });
+
+        return {
+          saveTrip: async (trip) => {
+            if (!auth.currentUser) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', trip.id);
+            await setDoc(docRef, trip, { merge: true });
+          },
+          deleteTrip: async (tripId) => {
+            if (!auth.currentUser) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId);
+            await deleteDoc(docRef);
+          },
+          unsubscribe
+        };
+      } catch (err) {
+        console.error("Cloud initialization failed:", err);
+        onStatusChange && onStatusChange('local');
+        return null;
+      }
+    };
+  </script>
 
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    const IconCompass = ({ className = "w-5 h-5" }) => (
-      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-    );
+    // Iconos SVG Integrados
     const IconPlus = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     );
@@ -110,6 +178,9 @@
     const IconCheckCircle = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
     );
+    const IconCloud = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M17.5 19x-11a5.5 5.5 0 0 1-.3-11A7 7 0 0 1 19.8 8c1.8.3 3.2 1.9 3.2 3.8 0 2.1-1.7 3.8-3.8 3.8h-1.7Z"/></svg>
+    );
 
     const PRESET_COVERS = [
       { name: "Japón (Tokio / Kioto)", url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1200&auto=format&fit=crop" },
@@ -138,7 +209,7 @@
 
     const INITIAL_TRIPS = [
       {
-        id: 'trip-japon-china',
+        id: 'trip-japon-china-2026',
         title: 'Japón & China Experiencia 2026',
         subtitle: 'Tokio, Kioto, Osaka, Pekín y Shanghai',
         startDate: '2026-10-10',
@@ -146,7 +217,7 @@
         currency: 'USD',
         targetBudget: 4500,
         coverImage: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1200&auto=format&fit=crop',
-        notes: 'Viaje de 18 días por Asia. Traer adaptador universal y pasaporte vigente.',
+        notes: 'Viaje de 18 días por Asia. Traer adaptador universal de enchufe y pasaporte vigente.',
         flights: [
           { id: 'f1', company: 'ANA / Air China', route: 'Bogotá -> Tokio (HND)', date: '2026-10-10', cost: 1350, bookingRef: 'NH8291', notes: 'Incluye 2 maletas de 23kg' }
         ],
@@ -200,6 +271,7 @@
       const [activeTripId, setActiveTripId] = useState(() => trips.length > 0 ? trips[0].id : null);
       const [activeTab, setActiveTab] = useState('resumen');
       const [searchQuery, setSearchQuery] = useState('');
+      const [syncStatus, setSyncStatus] = useState('syncing'); // 'syncing', 'online', 'local', 'error'
 
       const [showNewTripModal, setShowNewTripModal] = useState(false);
       const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -209,22 +281,70 @@
       const [showAiModal, setShowAiModal] = useState(false);
       const [toastMessage, setToastMessage] = useState('');
 
+      const cloudRef = useRef(null);
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
 
-      const activeTrip = useMemo(() => {
-        return trips.find(t => t.id === activeTripId) || null;
-      }, [trips, activeTripId]);
+      // Sincronizar en la nube al iniciar
+      useEffect(() => {
+        let isMounted = true;
+        
+        if (window.initCloudSync) {
+          window.initCloudSync(
+            (cloudTrips) => {
+              if (!isMounted) return;
+              if (cloudTrips && cloudTrips.length > 0) {
+                setTrips(cloudTrips);
+                if (!activeTripId || !cloudTrips.find(t => t.id === activeTripId)) {
+                  setActiveTripId(cloudTrips[0].id);
+                }
+              } else {
+                // Si la nube está vacía, inicializar con los datos por defecto
+                INITIAL_TRIPS.forEach(t => {
+                  if (cloudRef.current) cloudRef.current.saveTrip(t);
+                });
+              }
+            },
+            (status) => {
+              if (isMounted) setSyncStatus(status);
+            }
+          ).then((cloudManager) => {
+            if (cloudManager) cloudRef.current = cloudManager;
+          });
+        } else {
+          setSyncStatus('local');
+        }
 
+        return () => {
+          isMounted = false;
+          if (cloudRef.current && cloudRef.current.unsubscribe) {
+            cloudRef.current.unsubscribe();
+          }
+        };
+      }, []);
+
+      // Respaldar localmente
       useEffect(() => {
         try {
           localStorage.setItem('travelplanner_trips', JSON.stringify(trips));
         } catch (e) {}
       }, [trips]);
 
+      const activeTrip = useMemo(() => {
+        return trips.find(t => t.id === activeTripId) || null;
+      }, [trips, activeTripId]);
+
       const showToast = (msg) => {
         setToastMessage(msg);
         setTimeout(() => setToastMessage(''), 3000);
+      };
+
+      // Guardar viaje actualizado en la nube y estado local
+      const saveAndUpdateTrips = (updatedTripsList, targetTripToSave) => {
+        setTrips(updatedTripsList);
+        if (cloudRef.current && targetTripToSave) {
+          cloudRef.current.saveTrip(targetTripToSave);
+        }
       };
 
       const activeTripStats = useMemo(() => {
@@ -249,6 +369,7 @@
         };
       }, [activeTrip]);
 
+      // Renderizar gráfico financiero
       useEffect(() => {
         if (activeTab === 'resumen' && activeTrip && chartRef.current) {
           if (chartInstanceRef.current) {
@@ -276,7 +397,7 @@
               maintainAspectRatio: false,
               plugins: {
                 legend: {
-                  position: 'right',
+                  position: 'bottom',
                   labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
                 }
               },
@@ -293,6 +414,9 @@
         }
         const updated = trips.filter(t => t.id !== tripId);
         setTrips(updated);
+        if (cloudRef.current) {
+          cloudRef.current.deleteTrip(tripId);
+        }
         setActiveTripId(updated[0].id);
         showToast(`Viaje "${tripName}" eliminado.`);
       };
@@ -300,43 +424,63 @@
       return (
         <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans">
           
-          {/* Header Bar */}
+          {/* Header Superior Principal */}
           <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
               
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <div className="bg-gradient-to-tr from-emerald-500 to-cyan-500 p-2 rounded-xl text-slate-950 shadow-lg shadow-emerald-500/20">
-                  <IconPlane className="w-6 h-6" />
+                  <IconPlane className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div>
-                  <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
-                    Planeador Luis & Marlin <span className="text-emerald-400 text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 font-semibold uppercase">PRO</span>
+                  <h1 className="font-bold text-sm sm:text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent flex items-center gap-1.5">
+                    Planeador Luis & Marlin <span className="text-emerald-400 text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 font-semibold uppercase">PRO</span>
                   </h1>
-                  <p className="text-xs text-slate-400">Organizador de viajes, cronograma y presupuestos</p>
+                  <p className="text-[10px] sm:text-xs text-slate-400 line-clamp-1">Organizador de viajes, cronograma y presupuestos</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {/* Indicador de Estado de Sincronización */}
+                <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-[11px] font-medium">
+                  {syncStatus === 'online' ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-emerald-400">Sincronizado en Línea (Móvil & PC)</span>
+                    </>
+                  ) : syncStatus === 'syncing' ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-spin"></span>
+                      <span className="text-cyan-400">Conectando Nube...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+                      <span className="text-slate-400">Modo Local</span>
+                    </>
+                  )}
+                </div>
+
                 <button
                   onClick={() => setShowAiModal(true)}
-                  className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 text-cyan-300 border border-cyan-500/30 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all"
+                  className="hidden sm:flex items-center gap-1.5 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 text-cyan-300 border border-cyan-500/30 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
                 >
                   <IconSparkles className="w-4 h-4 text-cyan-400" />
-                  Asistente IA de Viajes
+                  Asistente IA
                 </button>
 
                 <button
                   onClick={() => setShowNewTripModal(true)}
-                  className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                  className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
                 >
                   <IconPlus className="w-4 h-4" />
-                  Nuevo Viaje
+                  <span>Nuevo Viaje</span>
                 </button>
               </div>
             </div>
           </header>
 
-          {/* Toast Notification */}
+          {/* Toast de Notificaciones */}
           {toastMessage && (
             <div className="fixed bottom-5 right-5 z-50 bg-slate-900 border border-emerald-500/40 text-emerald-300 px-4 py-3 rounded-2xl shadow-2xl text-xs flex items-center gap-2 animate-bounce">
               <IconCheckCircle className="w-4 h-4 text-emerald-400" />
@@ -344,12 +488,12 @@
             </div>
           )}
 
-          {/* Main Dashboard */}
+          {}
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
             
-            {/* Lista de Viajes */}
+            {/* Tarjetas de Viajes */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                   <IconMap className="w-4 h-4 text-emerald-400" />
                   Mis Viajes Programados ({trips.length})
@@ -359,7 +503,7 @@
                   placeholder="Buscar viaje..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                  className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 w-full sm:w-48"
                 />
               </div>
 
@@ -442,11 +586,11 @@
               </div>
             </div>
 
-            {/* Dashboard del Viaje Activo */}
+            {/* Dashboard del Viaje Seleccionado */}
             {activeTrip && (
               <div className="space-y-6 pt-2">
                 
-                {/* Banner de Portada */}
+                {/* Banner de Portada y Título */}
                 <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl">
                   <div className="h-48 sm:h-64 w-full relative">
                     <img
@@ -489,7 +633,7 @@
                           </span>
                         </div>
                         <div className="border-l border-slate-800 pl-4">
-                          <span className="text-slate-400 block text-[10px] uppercase font-sans">Presupuesto</span>
+                          <span className="text-slate-400 block text-[10px] uppercase font-sans">Presupuesto Meta</span>
                           <span className="text-slate-200 font-bold text-base">
                             {formatMoney(activeTrip.targetBudget, activeTrip.currency)}
                           </span>
@@ -498,12 +642,12 @@
                     </div>
                   </div>
 
-                  {/* NAVEGACIÓN DE PESTAÑAS */}
-                  <div className="border-t border-slate-800/80 bg-slate-900/90 px-6 py-3 flex items-center space-x-2 overflow-x-auto">
+                  {/* NAVEGACIÓN DE PESTAÑAS DEL VIAJE */}
+                  <div className="border-t border-slate-800/80 bg-slate-900/90 px-4 sm:px-6 py-3 flex items-center space-x-2 overflow-x-auto">
                     {[
                       { id: 'resumen', label: 'Resumen & Presupuesto', icon: IconPieChart },
                       { id: 'cronograma', label: 'Cronograma & Actividades', icon: IconCalendar },
-                      { id: 'vuelos', label: 'Vuelos & Transporte', icon: IconPlane },
+                      { id: 'vuelos', label: 'Vuelos & Pasajes', icon: IconPlane },
                       { id: 'hoteles', label: 'Alojamiento & Hoteles', icon: IconHotel },
                       { id: 'gastos', label: 'Bitácora de Gastos', icon: IconReceipt }
                     ].map(tab => {
@@ -512,7 +656,7 @@
                         <button
                           key={tab.id}
                           onClick={() => setActiveTab(tab.id)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                             activeTab === tab.id
                               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -526,7 +670,7 @@
                   </div>
                 </div>
 
-                {/* TAB: RESUMEN */}
+                {}
                 {activeTab === 'resumen' && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-1 glass-panel p-6 rounded-3xl space-y-4">
@@ -558,7 +702,7 @@
                       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                         <h3 className="font-bold text-sm text-slate-200 flex items-center gap-2">
                           <IconWallet className="w-4 h-4 text-cyan-400" />
-                          Balance de Presupuesto y Estado
+                          Balance de Presupuesto
                         </h3>
                         <span className="text-xs font-bold text-emerald-400 font-mono">
                           {activeTripStats.remaining >= 0 ? 'Disponible' : 'Excedido'}
@@ -589,7 +733,7 @@
                       </div>
 
                       <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 space-y-3">
-                        <h4 className="text-xs font-bold text-slate-300">Notas & Observaciones del Viaje</h4>
+                        <h4 className="text-xs font-bold text-slate-300">Notas & Observaciones</h4>
                         <p className="text-xs text-slate-400 leading-relaxed italic">
                           "{activeTrip.notes || 'Sin notas registradas para este viaje.'}"
                         </p>
@@ -615,7 +759,7 @@
                   </div>
                 )}
 
-                {/* TAB: CRONOGRAMA */}
+                {}
                 {activeTab === 'cronograma' && (
                   <div className="glass-panel p-6 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -682,13 +826,9 @@
                             <div className="p-4 pt-0 flex justify-end">
                               <button
                                 onClick={() => {
-                                  const updated = trips.map(t => {
-                                    if (t.id === activeTrip.id) {
-                                      return { ...t, activities: t.activities.filter(a => a.id !== act.id) };
-                                    }
-                                    return t;
-                                  });
-                                  setTrips(updated);
+                                  const updatedTrip = { ...activeTrip, activities: activeTrip.activities.filter(a => a.id !== act.id) };
+                                  const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                  saveAndUpdateTrips(updatedList, updatedTrip);
                                   showToast("Actividad eliminada.");
                                 }}
                                 className="text-slate-500 hover:text-red-400 p-1 transition-colors text-xs flex items-center gap-1"
@@ -704,7 +844,7 @@
                   </div>
                 )}
 
-                {/* TAB: VUELOS */}
+                {}
                 {activeTab === 'vuelos' && (
                   <div className="glass-panel p-6 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -758,13 +898,9 @@
                               <span className="text-[11px] text-slate-400 italic">{fl.notes}</span>
                               <button
                                 onClick={() => {
-                                  const updated = trips.map(t => {
-                                    if (t.id === activeTrip.id) {
-                                      return { ...t, flights: t.flights.filter(f => f.id !== fl.id) };
-                                    }
-                                    return t;
-                                  });
-                                  setTrips(updated);
+                                  const updatedTrip = { ...activeTrip, flights: activeTrip.flights.filter(f => f.id !== fl.id) };
+                                  const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                  saveAndUpdateTrips(updatedList, updatedTrip);
                                   showToast("Vuelo eliminado.");
                                 }}
                                 className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
@@ -779,7 +915,6 @@
                   </div>
                 )}
 
-                {/* TAB: HOTELES */}
                 {activeTab === 'hoteles' && (
                   <div className="glass-panel p-6 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -838,13 +973,9 @@
                               </span>
                               <button
                                 onClick={() => {
-                                  const updated = trips.map(t => {
-                                    if (t.id === activeTrip.id) {
-                                      return { ...t, stays: t.stays.filter(s => s.id !== st.id) };
-                                    }
-                                    return t;
-                                  });
-                                  setTrips(updated);
+                                  const updatedTrip = { ...activeTrip, stays: activeTrip.stays.filter(s => s.id !== st.id) };
+                                  const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                  saveAndUpdateTrips(updatedList, updatedTrip);
                                   showToast("Alojamiento eliminado.");
                                 }}
                                 className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
@@ -859,7 +990,7 @@
                   </div>
                 )}
 
-                {/* TAB: GASTOS */}
+                {}
                 {activeTab === 'gastos' && (
                   <div className="glass-panel p-6 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -918,13 +1049,9 @@
                                   <td className="p-3 text-center">
                                     <button
                                       onClick={() => {
-                                        const updated = trips.map(t => {
-                                          if (t.id === activeTrip.id) {
-                                            return { ...t, expenses: t.expenses.filter(e => e.id !== exp.id) };
-                                          }
-                                          return t;
-                                        });
-                                        setTrips(updated);
+                                        const updatedTrip = { ...activeTrip, expenses: activeTrip.expenses.filter(e => e.id !== exp.id) };
+                                        const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                        saveAndUpdateTrips(updatedList, updatedTrip);
                                         showToast("Gasto eliminado.");
                                       }}
                                       className="text-slate-500 hover:text-red-400 transition-colors"
@@ -947,12 +1074,12 @@
 
           </main>
 
-          {/* Modals Section */}
-
+          {}
+          
           {/* Modal Nuevo Viaje */}
           {showNewTripModal && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="font-bold text-slate-100 text-base">Crear Nuevo Viaje</h3>
                   <button onClick={() => setShowNewTripModal(false)} className="text-slate-500 hover:text-slate-300">
@@ -980,10 +1107,11 @@
                       expenses: []
                     };
 
-                    setTrips([newTrip, ...trips]);
+                    const updatedList = [newTrip, ...trips];
+                    saveAndUpdateTrips(updatedList, newTrip);
                     setActiveTripId(newTrip.id);
                     setShowNewTripModal(false);
-                    showToast(`Viaje "${newTrip.title}" creado con éxito.`);
+                    showToast(`Viaje "${newTrip.title}" creado.`);
                   }}
                   className="space-y-4 text-xs"
                 >
@@ -1137,16 +1265,12 @@
                       date: formData.get('date')
                     };
 
-                    const updatedTrips = trips.map(t => {
-                      if (t.id === activeTrip.id) {
-                        return { ...t, expenses: [newExpense, ...(t.expenses || [])] };
-                      }
-                      return t;
-                    });
+                    const updatedTrip = { ...activeTrip, expenses: [newExpense, ...(activeTrip.expenses || [])] };
+                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                    saveAndUpdateTrips(updatedList, updatedTrip);
 
-                    setTrips(updatedTrips);
                     setShowExpenseModal(false);
-                    showToast("Gasto registrado correctamente.");
+                    showToast("Gasto registrado.");
                   }}
                   className="space-y-4 text-xs"
                 >
@@ -1215,12 +1339,12 @@
             </div>
           )}
 
-          {/* Modal Actividad con Imagen */}
+          {/* Modal Actividad */}
           {showActivityModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="font-bold text-slate-100 text-base">Agregar Actividad & Foto Referencia</h3>
+                  <h3 className="font-bold text-slate-100 text-base">Agregar Actividad & Foto</h3>
                   <button onClick={() => setShowActivityModal(false)} className="text-slate-500 hover:text-slate-300">
                     <IconX className="w-5 h-5" />
                   </button>
@@ -1240,14 +1364,10 @@
                       notes: formData.get('notes')
                     };
 
-                    const updatedTrips = trips.map(t => {
-                      if (t.id === activeTrip.id) {
-                        return { ...t, activities: [newAct, ...(t.activities || [])] };
-                      }
-                      return t;
-                    });
+                    const updatedTrip = { ...activeTrip, activities: [newAct, ...(activeTrip.activities || [])] };
+                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                    saveAndUpdateTrips(updatedList, updatedTrip);
 
-                    setTrips(updatedTrips);
                     setShowActivityModal(false);
                     showToast("Actividad añadida al itinerario.");
                   }}
@@ -1293,7 +1413,7 @@
                       />
                     </div>
                     <div>
-                      <label className="text-slate-400 block mb-1 font-medium">Foto de Referencia</label>
+                      <label className="text-slate-400 block mb-1 font-medium">Foto Referencia</label>
                       <label className="cursor-pointer bg-slate-950 border border-slate-800 border-dashed rounded-xl p-2 text-center text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50 transition-all flex items-center justify-center gap-1 text-[11px] mb-1">
                         <IconUpload className="w-3.5 h-3.5" />
                         <span>Subir local</span>
@@ -1365,14 +1485,10 @@
                       notes: formData.get('notes')
                     };
 
-                    const updatedTrips = trips.map(t => {
-                      if (t.id === activeTrip.id) {
-                        return { ...t, flights: [newFlight, ...(t.flights || [])] };
-                      }
-                      return t;
-                    });
+                    const updatedTrip = { ...activeTrip, flights: [newFlight, ...(activeTrip.flights || [])] };
+                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                    saveAndUpdateTrips(updatedList, updatedTrip);
 
-                    setTrips(updatedTrips);
                     setShowFlightModal(false);
                     showToast("Vuelo registrado.");
                   }}
@@ -1431,14 +1547,10 @@
                       image: formData.get('image')
                     };
 
-                    const updatedTrips = trips.map(t => {
-                      if (t.id === activeTrip.id) {
-                        return { ...t, stays: [newStay, ...(t.stays || [])] };
-                      }
-                      return t;
-                    });
+                    const updatedTrip = { ...activeTrip, stays: [newStay, ...(activeTrip.stays || [])] };
+                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                    saveAndUpdateTrips(updatedList, updatedTrip);
 
-                    setTrips(updatedTrips);
                     setShowStayModal(false);
                     showToast("Alojamiento registrado.");
                   }}
@@ -1514,7 +1626,7 @@
 
                 <div className="space-y-3 text-xs text-slate-300">
                   <p>
-                    Ingresa el destino y la cantidad de días para obtener una sugerencia de itinerario y estimación de costos en español con <strong>Gemini 3 Flash</strong>:
+                    Ingresa el destino y la cantidad de días para obtener una estimación de presupuesto sugerida impulsada por <strong>Gemini 3 Flash</strong>:
                   </p>
 
                   <form
@@ -1528,8 +1640,8 @@
                       btn.innerText = "Consultando a Gemini...";
 
                       try {
-                        const systemPrompt = "Eres un experto asesor de viajes. Entrega itinerarios concisos, estimación de gastos desglosados y consejos clave.";
-                        const userQuery = `Sugiéreme un itinerario y presupuesto estimado para un viaje a: ${query}.`;
+                        const systemPrompt = "Eres un agente experto en planificación de viajes internacionales. Proporciona estimaciones claras de gastos (Vuelos, Hoteles, Comidas, Transporte) y actividades recomendadas en formato estructurado en español.";
+                        const userQuery = `Sugiéreme un itinerario y estimación de presupuesto desglosada para un viaje a: ${query}.`;
 
                         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=`;
 
@@ -1546,12 +1658,12 @@
                         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
                         if (text) {
-                          alert(`Recomendación de Gemini para ${query}:\n\n` + text.substring(0, 750) + '...');
+                          alert(`Respuesta de IA para ${query}:\n\n` + text.substring(0, 800) + '...');
                         } else {
                           showToast("No se pudo obtener la respuesta de la IA.");
                         }
                       } catch (err) {
-                        showToast("Error conectando con Gemini API.");
+                        showToast("Error consultando la API de Gemini.");
                       } finally {
                         setShowAiModal(false);
                       }
@@ -1586,14 +1698,16 @@
             </div>
           )}
 
-          <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
-            Planeador Luis & Marlin Pro &copy; {new Date().getFullYear()} — Diseñado para la organización financiera e itinerarios visuales.
+          {}
+          <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500 mt-auto">
+            Planeador Luis & Marlin Pro &copy; {new Date().getFullYear()} — Sincronización en la nube en tiempo real (Móvil & PC).
           </footer>
 
         </div>
       );
     }
 
+    // Inicialización del DOM
     ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
