@@ -6,24 +6,16 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>Planeador Luis & Marlin Pro - Organizador de Viajes</title>
+  <title>Planeador Luis & Marlin Pro</title>
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-  <!-- React 18 & ReactDOM UMD -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-
-  <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Chart.js para gráficas de presupuesto -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
@@ -72,13 +64,12 @@
 
   <script type="text/javascript">
     const DEFAULT_SYNC_ROOM = "LUIS-MARLIN-2026";
-    const LOCAL_STORAGE_KEY = "planner_payload_v6";
-    const DIRTY_FLAG_KEY = "planner_is_dirty_v6";
+    const MASTER_STORAGE_KEY = "luis_marlin_trips_master_v10";
 
-    // Compresor ultraligero de imágenes
+    // Compresor ultraligero de imágenes para prevenir QuotaExceededError en localStorage
     window.compressImage = function(file, maxWidth = 250, maxHeight = 250, quality = 0.35) {
       return new Promise((resolve) => {
-        if (!file || !file.type.startsWith('image/')) {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
           resolve(null);
           return;
         }
@@ -114,7 +105,7 @@
       });
     };
 
-    // Motor Nube con protección estricta de borrador local
+    // Motor Nube Secundario
     window.CloudEngine = {
       getRoomId() {
         try {
@@ -135,7 +126,6 @@
       async fetchCloudPayload(customRoom) {
         const room = customRoom || this.getRoomId();
         const timestamp = Date.now();
-        
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json?_t=${timestamp}`;
           const fbRes = await fetch(fbUrl, { cache: 'no-store' });
@@ -146,24 +136,20 @@
             }
           }
         } catch (e) {}
-
         return null;
       },
       async pushCloudPayload(payload, customRoom) {
         const room = customRoom || this.getRoomId();
         let success = false;
-        const jsonString = JSON.stringify(payload);
-
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json`;
           const fbRes = await fetch(fbUrl, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: jsonString
+            body: JSON.stringify(payload)
           });
           if (fbRes.ok) success = true;
         } catch (e) {}
-
         return success;
       }
     };
@@ -172,6 +158,7 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
+    /* Iconos SVG Internos Reutilizables */
     const IconPlus = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     );
@@ -290,7 +277,7 @@
             coverImage: 'https://images.unsplash.com/photo-1580619305218-8423a7ef79b4?q=80&w=800&auto=format&fit=crop',
             activities: [
               { id: 'act-p2-1', time: '07:30 AM', title: 'Visita a las Salineras de Maras & Moray', city: 'Valle Sagrado', cost: 180000, photo: 'https://images.unsplash.com/photo-1580619305218-8423a7ef79b4?q=80&w=600&auto=format&fit=crop', notes: 'Boleto Turístico parcial incluido.' },
-              { id: 'act-p2-2', time: '04:00 PM', title: 'Tren Expedition a Aguas Calientes (Machu Picchu Pueblo)', city: 'Ollantaytambo', cost: 650000, photo: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop', notes: 'Estar 30 minutos antes en la estación de Ollanta.' }
+              { id: 'act-p2-2', time: '04:00 PM', title: 'Tren Expedition a Aguas Calientes', city: 'Ollantaytambo', cost: 650000, photo: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop', notes: 'Estar 30 minutos antes en la estación.' }
             ]
           }
         ],
@@ -310,7 +297,7 @@
         coverImage: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1200&auto=format&fit=crop',
         notes: 'Viaje familiar para el 2026. Compras en Nueva York y playa en Punta Cana.',
         flights: [
-          { id: 'f1', company: 'Avianca / LATAM', route: 'Bogotá -> New York (JFK) -> Punta Cana (PUJ)', date: '2026-12-03', cost: 6975000, bookingRef: 'AV-9812', notes: 'Incluye equipaje de bodega' }
+          { id: 'f1', company: 'Avianca / LATAM', route: 'Bogotá -> New York (JFK) -> Punta Cana', date: '2026-12-03', cost: 6975000, bookingRef: 'AV-9812', notes: 'Incluye equipaje de bodega' }
         ],
         stays: [
           { id: 's1', name: 'Manhattan Hotel NYC', city: 'Nueva York', checkIn: '2026-12-03', checkOut: '2026-12-10', cost: 9490000, confirmCode: 'NYC-4412', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop' }
@@ -348,25 +335,57 @@
       }
     }
 
+    /* Helper indestructible para guardar en LocalStorage con compresión automática */
+    function saveToLocalStorage(tripsList) {
+      const timestamp = Date.now();
+      const payload = { trips: tripsList, updatedAt: timestamp };
+      try {
+        localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(payload));
+      } catch (err) {
+        console.warn("Exceso de memoria local. Comprimiendo fotos para asegurar guardado...", err);
+        // Despojar imágenes base64 masivas para asegurar que todos los datos estructurados queden 100% guardados
+        const safeTrips = tripsList.map(t => ({
+          ...t,
+          coverImage: (t.coverImage && t.coverImage.length > 50000) ? PRESET_COVERS[0].url : t.coverImage,
+          days: (t.days || []).map(d => ({
+            ...d,
+            coverImage: (d.coverImage && d.coverImage.length > 50000) ? PRESET_COVERS[0].url : d.coverImage,
+            activities: (d.activities || []).map(a => ({
+              ...a,
+              photo: (a.photo && a.photo.length > 50000) ? '' : a.photo
+            }))
+          })),
+          stays: (t.stays || []).map(s => ({
+            ...s,
+            image: (s.image && s.image.length > 50000) ? '' : s.image
+          }))
+        }));
+        try {
+          localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify({ trips: safeTrips, updatedAt: timestamp }));
+        } catch (e2) {
+          console.error("Error grave en localStorage", e2);
+        }
+      }
+      return timestamp;
+    }
+
     function App() {
       const [syncRoom, setSyncRoom] = useState(() => window.CloudEngine.getRoomId());
       const lastLocalUpdateRef = useRef(Date.now());
       
-      // Carga inicial segura: local storage es el dueño de la verdad
-      const [payloadState, setPayloadState] = useState(() => {
+      // Carga inicial sincrónica garantizada desde LocalStorage Fijo
+      const [trips, setTrips] = useState(() => {
         try {
-          const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-          if (saved) {
-            const parsed = JSON.parse(saved);
+          const raw = localStorage.getItem(MASTER_STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
             if (parsed && Array.isArray(parsed.trips) && parsed.trips.length > 0) {
-              return parsed;
+              return parsed.trips;
             }
           }
         } catch (e) {}
-        return { trips: INITIAL_TRIPS, updatedAt: Date.now() };
+        return INITIAL_TRIPS;
       });
-
-      const trips = payloadState.trips && payloadState.trips.length > 0 ? payloadState.trips : INITIAL_TRIPS;
 
       const [activeTripId, setActiveTripId] = useState(() => trips.length > 0 ? trips[0].id : null);
       const [activeTab, setActiveTab] = useState('cronograma');
@@ -394,79 +413,50 @@
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
 
-      // Guardado Local Primario Inviolable y Sincronización Nube
-      const saveAndUpdateTrips = async (newList) => {
-        const newTimestamp = Date.now();
-        lastLocalUpdateRef.current = newTimestamp;
-        
-        const newPayload = { trips: newList, updatedAt: newTimestamp };
+      // Función Maestra e Indestructible de Actualización
+      const updateTripsList = (newList) => {
+        setTrips(newList);
+        const timestamp = saveToLocalStorage(newList);
+        lastLocalUpdateRef.current = timestamp;
+        setSyncBadge('Guardado en Dispositivo');
 
-        // 1. Guardar de forma sincrónica en LocalStorage (NUNCA se borra en F5)
-        setPayloadState(newPayload);
-
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newPayload));
-          localStorage.setItem(DIRTY_FLAG_KEY, "true");
-          setSyncBadge('Guardado en Dispositivo');
-        } catch (e) {
-          console.warn("Storage warning:", e);
-        }
-
-        // 2. Intentar actualización en Nube
-        try {
-          const cloudOk = await window.CloudEngine.pushCloudPayload(newPayload, syncRoom);
-          if (cloudOk) {
-            localStorage.setItem(DIRTY_FLAG_KEY, "false");
-            setSyncBadge('Sincronizado Nube');
-          }
-        } catch (e) {}
+        // Intento asíncrono de Nube sin bloquear la interfaz ni el almacenamiento local
+        window.CloudEngine.pushCloudPayload({ trips: newList, updatedAt: timestamp }, syncRoom)
+          .then(ok => { if (ok) setSyncBadge('Sincronizado Nube'); })
+          .catch(() => {});
       };
 
-      // Control de Sincronización en la Nube
+      // Control de Sincronización Nube en Segundo Plano
       useEffect(() => {
         let isMounted = true;
-
         const autoSyncLoop = async () => {
-          // Si hubo modificación local hace menos de 10 segundos o hay borrador sucio, sincronizar local -> nube primero
-          const isDirty = localStorage.getItem(DIRTY_FLAG_KEY) === "true";
-          if (Date.now() - lastLocalUpdateRef.current < 10000 || isDirty) {
-            try {
-              const cloudOk = await window.CloudEngine.pushCloudPayload(payloadState, syncRoom);
-              if (cloudOk) {
-                localStorage.setItem(DIRTY_FLAG_KEY, "false");
-                if (isMounted) setSyncBadge('Sincronizado Nube');
-              }
-            } catch (e) {}
-            return;
-          }
+          // Si hubo modificación local reciente, no descargar para evitar sobrescrituras
+          if (Date.now() - lastLocalUpdateRef.current < 12000) return;
 
-          // Si el estado local está limpio, verificar si la nube tiene algo más nuevo de otro dispositivo
           const cloudPayload = await window.CloudEngine.fetchCloudPayload(syncRoom);
           if (isMounted && cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
-            const localTimestamp = payloadState.updatedAt || 0;
-            const cloudTimestamp = cloudPayload.updatedAt || 0;
-
-            // Únicamente reemplazar si la nube es estrictamente más nueva (+3 segundos)
-            if (cloudTimestamp > localTimestamp + 3000) {
-              setPayloadState(cloudPayload);
+            const rawLocal = localStorage.getItem(MASTER_STORAGE_KEY);
+            let localTimestamp = lastLocalUpdateRef.current;
+            if (rawLocal) {
               try {
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudPayload));
-              } catch (e) {}
+                const parsed = JSON.parse(rawLocal);
+                if (parsed.updatedAt) localTimestamp = Math.max(localTimestamp, parsed.updatedAt);
+              } catch(e) {}
+            }
+
+            const cloudTimestamp = cloudPayload.updatedAt || 0;
+            // Solo descargar si la versión en la nube es estrictamente más nueva (+5 segundos)
+            if (cloudTimestamp > localTimestamp + 5000) {
+              setTrips(cloudPayload.trips);
+              saveToLocalStorage(cloudPayload.trips);
               setSyncBadge('Actualizado de Nube');
-              if (!activeTripId || !cloudPayload.trips.find(t => t.id === activeTripId)) {
-                setActiveTripId(cloudPayload.trips[0].id);
-              }
             }
           }
         };
 
-        const syncInterval = setInterval(autoSyncLoop, 8000);
-
-        return () => {
-          isMounted = false;
-          clearInterval(syncInterval);
-        };
-      }, [syncRoom, payloadState.updatedAt]);
+        const interval = setInterval(autoSyncLoop, 9000);
+        return () => { isMounted = false; clearInterval(interval); };
+      }, [syncRoom]);
 
       const showToast = (msg) => {
         setToastMessage(msg);
@@ -553,7 +543,7 @@
           return;
         }
         const updatedList = trips.filter(t => t.id !== tripId);
-        saveAndUpdateTrips(updatedList);
+        updateTripsList(updatedList);
         if (activeTripId === tripId) {
           setActiveTripId(updatedList[0].id);
         }
@@ -674,7 +664,7 @@
         };
 
         const updatedList = [newTrip, ...trips];
-        saveAndUpdateTrips(updatedList);
+        updateTripsList(updatedList);
         setActiveTripId(newTrip.id);
         setShowAiModal(false);
         setAiResult(null);
@@ -919,7 +909,7 @@
                   </div>
                 </div>
 
-                {}
+                {/* TAB CRONOGRAMA POR DÍAS */}
                 {activeTab === 'cronograma' && (
                   <div className="glass-panel p-4 sm:p-6 rounded-3xl space-y-8">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -992,7 +982,7 @@
                                     const updatedDays = activeTrip.days.filter(d => d.id !== day.id);
                                     const updatedTrip = { ...activeTrip, days: updatedDays };
                                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                    saveAndUpdateTrips(updatedList);
+                                    updateTripsList(updatedList);
                                     showToast(`Día "${day.title}" eliminado.`);
                                   }}
                                   className="absolute top-3 right-3 bg-slate-950/80 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-800 p-2 rounded-xl transition-all"
@@ -1111,7 +1101,7 @@
                                               });
                                               const updatedTrip = { ...activeTrip, days: updatedDays };
                                               const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                              saveAndUpdateTrips(updatedList);
+                                              updateTripsList(updatedList);
                                               showToast("Actividad eliminada.");
                                             }}
                                             className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
@@ -1237,7 +1227,7 @@
                   </div>
                 )}
 
-                {}
+                {/* TAB VUELOS */}
                 {activeTab === 'vuelos' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1293,7 +1283,7 @@
                                 onClick={() => {
                                   const updatedTrip = { ...activeTrip, flights: activeTrip.flights.filter(f => f.id !== fl.id) };
                                   const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                  saveAndUpdateTrips(updatedList);
+                                  updateTripsList(updatedList);
                                   showToast("Vuelo eliminado.");
                                 }}
                                 className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
@@ -1308,7 +1298,7 @@
                   </div>
                 )}
 
-                {}
+                {/* TAB HOTELES */}
                 {activeTab === 'hoteles' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1369,7 +1359,7 @@
                                 onClick={() => {
                                   const updatedTrip = { ...activeTrip, stays: activeTrip.stays.filter(s => s.id !== st.id) };
                                   const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                  saveAndUpdateTrips(updatedList);
+                                  updateTripsList(updatedList);
                                   showToast("Alojamiento eliminado.");
                                 }}
                                 className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
@@ -1384,7 +1374,7 @@
                   </div>
                 )}
 
-                {}
+                {/* TAB GASTOS */}
                 {activeTab === 'gastos' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1445,7 +1435,7 @@
                                       onClick={() => {
                                         const updatedTrip = { ...activeTrip, expenses: activeTrip.expenses.filter(e => e.id !== exp.id) };
                                         const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                        saveAndUpdateTrips(updatedList);
+                                        updateTripsList(updatedList);
                                         showToast("Gasto eliminado.");
                                       }}
                                       className="text-slate-500 hover:text-red-400 transition-colors"
@@ -1468,7 +1458,7 @@
 
           </main>
 
-          {}
+          {/* MODAL SALA Y RESPALDO */}
           {showRoomModal && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
@@ -1504,8 +1494,8 @@
                         
                         const cloudPayload = await window.CloudEngine.fetchCloudPayload(savedRoom);
                         if (cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
-                          setPayloadState(cloudPayload);
-                          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudPayload));
+                          setTrips(cloudPayload.trips);
+                          saveToLocalStorage(cloudPayload.trips);
                         }
                       }}
                       className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
@@ -1517,7 +1507,8 @@
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(JSON.stringify(payloadState));
+                          const payload = { trips, updatedAt: Date.now() };
+                          navigator.clipboard.writeText(JSON.stringify(payload));
                           showToast("📋 Respaldo copiado al portapapeles.");
                         }}
                         className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold border border-slate-700 text-center flex items-center justify-center gap-1.5"
@@ -1528,18 +1519,18 @@
 
                       <button
                         type="button"
-                        onClick={async () => {
+                        onClick={() => {
                           const jsonPrompt = prompt("Pega aquí el código JSON de tu respaldo:");
                           if (jsonPrompt) {
                             try {
                               const parsed = JSON.parse(jsonPrompt);
                               if (parsed && Array.isArray(parsed.trips)) {
-                                await saveAndUpdateTrips(parsed.trips);
+                                updateTripsList(parsed.trips);
                                 setShowRoomModal(false);
                                 showToast("✅ Respaldo importado con éxito.");
                               }
                             } catch (e) {
-                              alert("El código pegado no es un JSON válido.");
+                              showToast("El código pegado no es un JSON válido.");
                             }
                           }
                         }}
@@ -1588,7 +1579,7 @@
                     const updatedTrip = { ...activeTrip, days: updatedDays };
                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
                     
-                    await saveAndUpdateTrips(updatedList);
+                    updateTripsList(updatedList);
                     setShowDayModal(false);
                     showToast(`Día ${newDay.dayNumber} creado.`);
                   }}
@@ -1676,7 +1667,7 @@
             </div>
           )}
 
-          {}
+          {/* MODAL ACTIVIDADES PASO A PASO */}
           {showActivityModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1731,7 +1722,7 @@
 
                     const updatedTrip = { ...activeTrip, days: updatedDays };
                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                    await saveAndUpdateTrips(updatedList);
+                    updateTripsList(updatedList);
 
                     setShowActivityModal(false);
                     showToast("Paso agregado al itinerario.");
@@ -1892,7 +1883,7 @@
                     };
 
                     const updatedList = [newTrip, ...trips];
-                    await saveAndUpdateTrips(updatedList);
+                    updateTripsList(updatedList);
                     setActiveTripId(newTrip.id);
                     setShowNewTripModal(false);
                     showToast(`Viaje "${newTrip.title}" creado.`);
@@ -2022,7 +2013,7 @@
             </div>
           )}
 
-          {}
+          {/* MODAL REGISTRAR GASTO */}
           {showExpenseModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
@@ -2047,7 +2038,7 @@
 
                     const updatedTrip = { ...activeTrip, expenses: [newExpense, ...(activeTrip.expenses || [])] };
                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                    await saveAndUpdateTrips(updatedList);
+                    updateTripsList(updatedList);
 
                     setShowExpenseModal(false);
                     showToast("Gasto registrado.");
@@ -2146,7 +2137,7 @@
 
                     const updatedTrip = { ...activeTrip, flights: [newFlight, ...(activeTrip.flights || [])] };
                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                    await saveAndUpdateTrips(updatedList);
+                    updateTripsList(updatedList);
 
                     setShowFlightModal(false);
                     showToast("Vuelo registrado.");
@@ -2208,7 +2199,7 @@
 
                     const updatedTrip = { ...activeTrip, stays: [newStay, ...(activeTrip.stays || [])] };
                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                    await saveAndUpdateTrips(updatedList);
+                    updateTripsList(updatedList);
 
                     setShowStayModal(false);
                     showToast("Alojamiento registrado.");
@@ -2269,7 +2260,7 @@
             </div>
           )}
 
-          {}
+          {/* MODAL ASISTENTE IA */}
           {showAiModal && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
