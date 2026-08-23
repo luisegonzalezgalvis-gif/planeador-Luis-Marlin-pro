@@ -72,8 +72,8 @@
     const DEFAULT_SYNC_ROOM = "LUIS-MARLIN-2026";
     const MASTER_STORAGE_KEY = "luis_marlin_trips_master_v10";
 
-    // Compresor de imágenes para evitar fallos de envío en Firebase / LocalStorage
-    window.compressImage = function(file, maxWidth = 1200, maxHeight = 700, quality = 0.75) {
+    // Compresor de imágenes panorámicas y estándar para prevenir límites de memoria
+    window.compressImage = function(file, maxWidth = 1600, maxHeight = 900, quality = 0.75) {
       return new Promise((resolve) => {
         if (!file || !file.type || !file.type.startsWith('image/')) {
           resolve(null);
@@ -150,7 +150,6 @@
         const room = customRoom || this.getRoomId();
         const timestamp = Date.now();
 
-        // 1. Firebase RTDB
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json?_t=${timestamp}`;
           const fbRes = await fetch(fbUrl, { cache: 'no-store' });
@@ -162,27 +161,15 @@
           }
         } catch (e) {}
 
-        // 2. KVDB Fallback
+        // Fallback Pantry Cloud
         try {
-          const kvUrl = `https://kvdb.io/6W3s1v9Y8pQz2x4M7k/room_${room}?_t=${timestamp}`;
-          const kvRes = await fetch(kvUrl, { cache: 'no-store' });
-          if (kvRes.ok) {
-            const kvData = await kvRes.json();
-            if (kvData && Array.isArray(kvData.trips) && kvData.trips.length > 0) {
-              return kvData;
-            }
-          }
-        } catch (e) {}
-
-        // 3. Restful-API object store fallback
-        try {
-          const restUrl = `https://api.restful-api.dev/objects?_t=${timestamp}`;
-          const restRes = await fetch(restUrl, { cache: 'no-store' });
-          if (restRes.ok) {
-            const list = await restRes.json();
-            const found = list.find(item => item.name === `room_${room}`);
-            if (found && found.data && Array.isArray(found.data.trips) && found.data.trips.length > 0) {
-              return found.data;
+          const pantryId = "4d98f7e2-8231-4a12-98ab-3120bcde45f1";
+          const pUrl = `https://getpantry.cloud/apiv1/pantry/${pantryId}/basket/room_${room}?_t=${timestamp}`;
+          const pRes = await fetch(pUrl, { cache: 'no-store' });
+          if (pRes.ok) {
+            const pData = await pRes.json();
+            if (pData && Array.isArray(pData.trips) && pData.trips.length > 0) {
+              return pData;
             }
           }
         } catch (e) {}
@@ -196,7 +183,6 @@
 
         let success = false;
 
-        // 1. Firebase RTDB
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json`;
           const fbRes = await fetch(fbUrl, {
@@ -207,29 +193,16 @@
           if (fbRes.ok) success = true;
         } catch (e) {}
 
-        // 2. KVDB Fallback
+        // Fallback Pantry Cloud
         try {
-          const kvUrl = `https://kvdb.io/6W3s1v9Y8pQz2x4M7k/room_${room}`;
-          const kvRes = await fetch(kvUrl, {
+          const pantryId = "4d98f7e2-8231-4a12-98ab-3120bcde45f1";
+          const pUrl = `https://getpantry.cloud/apiv1/pantry/${pantryId}/basket/room_${room}`;
+          const pRes = await fetch(pUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(cleanPayload)
           });
-          if (kvRes.ok) success = true;
-        } catch (e) {}
-
-        // 3. REST API Object Store Fallback
-        try {
-          const restUrl = `https://api.restful-api.dev/objects`;
-          const restRes = await fetch(restUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: `room_${room}`,
-              data: cleanPayload
-            })
-          });
-          if (restRes.ok) success = true;
+          if (pRes.ok) success = true;
         } catch (e) {}
 
         return success;
@@ -240,11 +213,9 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
+    // Iconografía SVG ligera integrada
     const IconPlus = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    );
-    const IconPencil = ({ className = "w-4 h-4" }) => (
-      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
     );
     const IconSparkles = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1 1.275-1.275L12 3Z"/></svg>
@@ -279,6 +250,9 @@
     const IconTrash = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
     );
+    const IconPencil = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+    );
     const IconUpload = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     );
@@ -288,20 +262,20 @@
     const IconCheckCircle = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
     );
-    const IconClock = ({ className = "w-4 h-4" }) => (
-      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    );
     const IconRefresh = ({ className = "w-4 h-4" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
     );
+    const IconClock = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    );
 
     const PRESET_COVERS = [
-      { name: "Boyacá & Villa de Leyva", url: "https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=1600&auto=format&fit=crop" },
-      { name: "Perú & Machu Picchu HD", url: "https://images.unsplash.com/photo-1526392060635-9d6019884377?q=80&w=1600&auto=format&fit=crop" },
-      { name: "Nueva York - Brooklyn HD", url: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1600&auto=format&fit=crop" },
-      { name: "Punta Cana - Playa HD", url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop" },
-      { name: "Japón (Tokio / Kioto) HD", url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1600&auto=format&fit=crop" },
-      { name: "Europa (París / Roma) HD", url: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1600&auto=format&fit=crop" }
+      { name: "Boyacá Colonial", url: "https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=1600&auto=format&fit=crop" },
+      { name: "Perú & Cusco", url: "https://images.unsplash.com/photo-1526392060635-9d6019884377?q=80&w=1600&auto=format&fit=crop" },
+      { name: "Nueva York Skyline", url: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1600&auto=format&fit=crop" },
+      { name: "Caribe & Punta Cana", url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop" },
+      { name: "Japón & Tokio", url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1600&auto=format&fit=crop" },
+      { name: "Europa Colonial", url: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1600&auto=format&fit=crop" }
     ];
 
     const CATEGORIES = [
@@ -325,7 +299,7 @@
       {
         id: 'trip-boyaca-2026',
         title: 'Boyacá de ensueño',
-        subtitle: 'Villa de Leyva, Ráquira, Moniquirá, Sutamarchán',
+        subtitle: 'Villa de Leyva , Ráquira, moniquirá, sutamarchan',
         startDate: '2026-11-13',
         endDate: '2026-11-16',
         currency: 'COP',
@@ -351,13 +325,13 @@
         ],
         activities: [],
         expenses: [
-          { id: 'e-boy-1', title: 'Gasolina y Peajes', category: 'transporte_inter', cost: 220000, date: '2026-11-13' }
+          { id: 'e-boy-1', title: 'Gasolina, Peajes y Gastos Varios', category: 'transporte_inter', cost: 870000, date: '2026-11-13' }
         ]
       },
       {
         id: 'trip-peru-magico-2027',
         title: 'Perú Mágico',
-        subtitle: 'Cusco, Machu Picchu y Valle Sagrado',
+        subtitle: 'Cusco',
         startDate: '2027-05-02',
         endDate: '2027-05-10',
         currency: 'COP',
@@ -386,13 +360,13 @@
         ],
         activities: [],
         expenses: [
-          { id: 'e-peru-1', title: 'Boleto Turístico del Cusco', category: 'actividades', cost: 450000, date: '2027-05-03' }
+          { id: 'e-peru-1', title: 'Boleto Turístico del Cusco y Excursiones', category: 'actividades', cost: 670000, date: '2027-05-03' }
         ]
       },
       {
         id: 'trip-ny-puntacana-2026',
-        title: 'New York - Punta Cana',
-        subtitle: 'Manhattan y Resort Punta Cana',
+        title: 'New York - Punta cana',
+        subtitle: 'New york y punta cana',
         startDate: '2026-12-03',
         endDate: '2026-12-18',
         currency: 'COP',
@@ -420,7 +394,7 @@
         activities: [],
         expenses: [
           { id: 'e-ny-1', title: 'Transporte Metro / Taxi', category: 'transporte_local', cost: 220000, date: '2026-12-04' },
-          { id: 'e-ny-2', title: 'Comidas y Restaurantes', category: 'comidas', cost: 3600000, date: '2026-12-05' }
+          { id: 'e-ny-2', title: 'Comidas, Restaurantes y Compras', category: 'comidas', cost: 4735000, date: '2026-12-05' }
         ]
       }
     ];
@@ -486,34 +460,31 @@
       });
 
       const [activeTripId, setActiveTripId] = useState(() => trips.length > 0 ? trips[0].id : null);
-
-      // Declaración garantizada de activeTrip al inicio del hook
-      const activeTrip = useMemo(() => {
-        return (trips || []).find(t => t.id === activeTripId) || trips[0] || null;
-      }, [trips, activeTripId]);
-
       const [activeTab, setActiveTab] = useState('cronograma');
       const [searchQuery, setSearchQuery] = useState('');
-      const [syncBadge, setSyncBadge] = useState('Guardado en Dispositivo');
+      const [syncBadge, setSyncBadge] = useState('Guardado Local');
       const [isSyncing, setIsSyncing] = useState(false);
+      const [toastMessage, setToastMessage] = useState('');
 
-      // Modales de Interfaz
+      const [selectedCronogramaDayId, setSelectedCronogramaDayId] = useState('overview');
+      const [selectedDayIdForActivity, setSelectedDayIdForActivity] = useState(null);
+
+      // Modales
       const [showNewTripModal, setShowNewTripModal] = useState(false);
       const [showEditTripModal, setShowEditTripModal] = useState(false);
+      const [showDayModal, setShowDayModal] = useState(false);
       const [showEditDayModal, setShowEditDayModal] = useState(false);
       const [editingDay, setEditingDay] = useState(null);
-      const [showExpenseModal, setShowExpenseModal] = useState(false);
+
       const [showActivityModal, setShowActivityModal] = useState(false);
       const [showEditActivityModal, setShowEditActivityModal] = useState(false);
       const [editingActivity, setEditingActivity] = useState(null);
-      const [showDayModal, setShowDayModal] = useState(false);
+
+      const [showExpenseModal, setShowExpenseModal] = useState(false);
       const [showFlightModal, setShowFlightModal] = useState(false);
       const [showStayModal, setShowStayModal] = useState(false);
       const [showAiModal, setShowAiModal] = useState(false);
       const [showRoomModal, setShowRoomModal] = useState(false);
-      const [selectedDayIdForActivity, setSelectedDayIdForActivity] = useState(null);
-      const [selectedCronogramaDayId, setSelectedCronogramaDayId] = useState('overview');
-      const [toastMessage, setToastMessage] = useState('');
 
       // Asistente IA
       const [aiQuery, setAiQuery] = useState('');
@@ -524,9 +495,48 @@
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
 
+      const activeTrip = useMemo(() => {
+        return trips.find(t => t.id === activeTripId) || trips[0] || null;
+      }, [trips, activeTripId]);
+
       const showToast = (msg) => {
         setToastMessage(msg);
-        setTimeout(() => setToastMessage(''), 3000);
+        setTimeout(() => setToastMessage(''), 3500);
+      };
+
+      const handleExportJsonBackup = () => {
+        const payload = { trips, updatedAt: Date.now() };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `Planeador_Luis_Marlin_Respaldo_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        showToast("📁 Copia descargada. Puedes guardarla en tu Google Drive o Celular.");
+      };
+
+      const handleImportJsonBackup = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const parsed = JSON.parse(event.target.result);
+            if (parsed && Array.isArray(parsed.trips) && parsed.trips.length > 0) {
+              updateTripsList(parsed.trips);
+              showToast("✨ ¡Respaldo importado correctamente desde tu archivo!");
+            } else if (Array.isArray(parsed) && parsed.length > 0) {
+              updateTripsList(parsed);
+              showToast("✨ ¡Respaldo importado correctamente desde tu archivo!");
+            } else {
+              showToast("⚠️ El archivo no contiene un formato de viajes válido.");
+            }
+          } catch (err) {
+            showToast("⚠️ Error al leer el archivo de respaldo.");
+          }
+        };
+        reader.readAsText(file);
       };
 
       const updateTripsList = (newList) => {
@@ -551,21 +561,22 @@
         lastLocalUpdateRef.current = timestamp;
         saveToLocalStorage(trips);
 
-        // Primero subimos nuestros viajes locales
+        // 1. Subir primero los datos actuales de este dispositivo a la Nube
         const pushedOk = await window.CloudEngine.pushCloudPayload({ trips, updatedAt: timestamp }, syncRoom);
         
-        // Luego intentamos leer si hay viajes remotos para fusionar
+        // 2. Consultar la Nube para fusionar si hay viajes nuevos de otro dispositivo
         const cloudPayload = await window.CloudEngine.fetchCloudPayload(syncRoom);
         setIsSyncing(false);
 
         if (cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
-          // Fusionar viajes por ID respetando los locales existentes
           const cloudTrips = cloudPayload.trips;
           const merged = [...trips];
           cloudTrips.forEach(cTrip => {
             const existsIdx = merged.findIndex(m => m.id === cTrip.id);
             if (existsIdx === -1) {
               merged.push(cTrip);
+            } else if ((cloudPayload.updatedAt || 0) > timestamp) {
+              merged[existsIdx] = cTrip;
             }
           });
           setTrips(merged);
@@ -585,7 +596,6 @@
       useEffect(() => {
         let isMounted = true;
 
-        // Intento de sincronización inmediata al cargar
         window.CloudEngine.pushCloudPayload({ trips, updatedAt: Date.now() }, syncRoom)
           .then(ok => {
             if (isMounted && ok) setSyncBadge('Sincronizado Nube');
@@ -853,20 +863,35 @@
               </div>
 
               <div className="flex items-center gap-1.5 sm:gap-2">
-                
                 {/* Botón / Estado de Sincronización */}
                 <button
                   onClick={forceManualCloudSync}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 border text-[10px] font-mono hover:border-emerald-500 transition-all shadow-sm ${
                     syncBadge === 'Sincronizado Nube' ? 'border-emerald-500/40 text-emerald-400' : 'border-amber-500/40 text-amber-300'
                   }`}
-                  title="Haz clic para forzar la sincronización inmediata con el celular"
+                  title="Haz clic para forzar la sincronización inmediata con la Nube"
                 >
                   <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-400 animate-ping' : syncBadge === 'Sincronizado Nube' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}></span>
                   <span className="font-bold hidden sm:inline">{isSyncing ? 'Sincronizando...' : syncBadge}</span>
                   <span className="text-slate-400 font-bold">({syncRoom})</span>
                   <IconRefresh className={`w-3.5 h-3.5 text-cyan-400 ml-0.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 </button>
+
+                {/* Botón Respaldo en Archivo / Drive */}
+                <button
+                  onClick={handleExportJsonBackup}
+                  className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-semibold transition-all"
+                  title="Guardar copia de seguridad en archivo JSON para Google Drive o PC"
+                >
+                  <IconUpload className="w-3.5 h-3.5 text-emerald-400 rotate-180" />
+                  <span className="hidden sm:inline">Drive / Backup</span>
+                </button>
+
+                <label className="cursor-pointer flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-semibold transition-all">
+                  <IconUpload className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="hidden sm:inline">Cargar Archivo</span>
+                  <input type="file" accept=".json" onChange={handleImportJsonBackup} className="hidden" />
+                </label>
 
                 <button
                   onClick={() => setShowAiModal(true)}
@@ -887,7 +912,7 @@
             </div>
           </header>
 
-          {/* Toast Notificación */}
+          {/* Toast de Notificación */}
           {toastMessage && (
             <div className="fixed bottom-5 right-5 z-50 bg-slate-900 border border-emerald-500/40 text-emerald-300 px-4 py-3 rounded-2xl shadow-2xl text-xs flex items-center gap-2 animate-bounce">
               <IconCheckCircle className="w-4 h-4 text-emerald-400" />
@@ -895,9 +920,9 @@
             </div>
           )}
 
+          {/* Main Content */}
           <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
             
-            {/* Lista de Viajes */}
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
@@ -993,6 +1018,7 @@
               </div>
             </div>
 
+            {/* Vista del Viaje Seleccionado */}
             {activeTrip && (
               <div className="space-y-6 pt-2">
                 <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl">
