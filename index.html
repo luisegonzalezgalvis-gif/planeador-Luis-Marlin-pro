@@ -72,7 +72,8 @@
 
   <script type="text/javascript">
     const DEFAULT_SYNC_ROOM = "LUIS-MARLIN-2026";
-    const LOCAL_STORAGE_KEY = "planner_payload_v5";
+    const LOCAL_STORAGE_KEY = "planner_payload_v6";
+    const DIRTY_FLAG_KEY = "planner_is_dirty_v6";
 
     // Compresor ultraligero de imágenes
     window.compressImage = function(file, maxWidth = 250, maxHeight = 250, quality = 0.35) {
@@ -113,7 +114,7 @@
       });
     };
 
-    // Motor Nube Multi-Canal con petición POST en Body
+    // Motor Nube con protección estricta de borrador local
     window.CloudEngine = {
       getRoomId() {
         try {
@@ -349,9 +350,9 @@
 
     function App() {
       const [syncRoom, setSyncRoom] = useState(() => window.CloudEngine.getRoomId());
-      const lastLocalUpdateRef = useRef(0);
+      const lastLocalUpdateRef = useRef(Date.now());
       
-      // Estado seguro con respaldo local primario
+      // Carga inicial segura: local storage es el dueño de la verdad
       const [payloadState, setPayloadState] = useState(() => {
         try {
           const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -393,49 +394,60 @@
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
 
-      // Guardado Local Primario y Sincronización
+      // Guardado Local Primario Inviolable y Sincronización Nube
       const saveAndUpdateTrips = async (newList) => {
         const newTimestamp = Date.now();
         lastLocalUpdateRef.current = newTimestamp;
         
         const newPayload = { trips: newList, updatedAt: newTimestamp };
 
-        // 1. Actualizar estado e inmediatamente escribir a LocalStorage de forma síncrona
+        // 1. Guardar de forma sincrónica en LocalStorage (NUNCA se borra en F5)
         setPayloadState(newPayload);
 
         try {
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newPayload));
+          localStorage.setItem(DIRTY_FLAG_KEY, "true");
           setSyncBadge('Guardado en Dispositivo');
         } catch (e) {
           console.warn("Storage warning:", e);
         }
 
-        // 2. Transmisión a la Nube
+        // 2. Intentar actualización en Nube
         try {
           const cloudOk = await window.CloudEngine.pushCloudPayload(newPayload, syncRoom);
           if (cloudOk) {
+            localStorage.setItem(DIRTY_FLAG_KEY, "false");
             setSyncBadge('Sincronizado Nube');
           }
         } catch (e) {}
       };
 
-      // Control de lectura desde la nube
+      // Control de Sincronización en la Nube
       useEffect(() => {
         let isMounted = true;
 
         const autoSyncLoop = async () => {
-          // Si hubo edición local hace menos de 10 segundos, omitir la lectura remota
-          if (Date.now() - lastLocalUpdateRef.current < 10000) {
+          // Si hubo modificación local hace menos de 10 segundos o hay borrador sucio, sincronizar local -> nube primero
+          const isDirty = localStorage.getItem(DIRTY_FLAG_KEY) === "true";
+          if (Date.now() - lastLocalUpdateRef.current < 10000 || isDirty) {
+            try {
+              const cloudOk = await window.CloudEngine.pushCloudPayload(payloadState, syncRoom);
+              if (cloudOk) {
+                localStorage.setItem(DIRTY_FLAG_KEY, "false");
+                if (isMounted) setSyncBadge('Sincronizado Nube');
+              }
+            } catch (e) {}
             return;
           }
 
+          // Si el estado local está limpio, verificar si la nube tiene algo más nuevo de otro dispositivo
           const cloudPayload = await window.CloudEngine.fetchCloudPayload(syncRoom);
           if (isMounted && cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
             const localTimestamp = payloadState.updatedAt || 0;
             const cloudTimestamp = cloudPayload.updatedAt || 0;
 
-            // Únicamente actualizar si la nube tiene un timestamp estrictamente mayor (+2 segundos)
-            if (cloudTimestamp > localTimestamp + 2000) {
+            // Únicamente reemplazar si la nube es estrictamente más nueva (+3 segundos)
+            if (cloudTimestamp > localTimestamp + 3000) {
               setPayloadState(cloudPayload);
               try {
                 localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudPayload));
@@ -907,7 +919,7 @@
                   </div>
                 </div>
 
-                {/* TAB CRONOGRAMA */}
+                {}
                 {activeTab === 'cronograma' && (
                   <div className="glass-panel p-4 sm:p-6 rounded-3xl space-y-8">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1225,7 +1237,7 @@
                   </div>
                 )}
 
-                {/* TAB VUELOS */}
+                {}
                 {activeTab === 'vuelos' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1296,7 +1308,7 @@
                   </div>
                 )}
 
-                {/* TAB HOTELES */}
+                {}
                 {activeTab === 'hoteles' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1372,7 +1384,7 @@
                   </div>
                 )}
 
-                {/* TAB GASTOS */}
+                {}
                 {activeTab === 'gastos' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1456,7 +1468,7 @@
 
           </main>
 
-          {/* MODAL SALA NUBE Y RESPALDO MANUAL */}
+          {}
           {showRoomModal && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
@@ -1664,7 +1676,7 @@
             </div>
           )}
 
-          {/* MODAL CREAR / PASO ACTIVIDAD */}
+          {}
           {showActivityModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -2010,7 +2022,7 @@
             </div>
           )}
 
-          {/* MODAL GASTO DIRECTO */}
+          {}
           {showExpenseModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
@@ -2257,7 +2269,7 @@
             </div>
           )}
 
-          {/* MODAL ASISTENTE IA */}
+          {}
           {showAiModal && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
