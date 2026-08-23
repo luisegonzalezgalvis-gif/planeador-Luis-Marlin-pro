@@ -398,6 +398,7 @@
       const [showAiModal, setShowAiModal] = useState(false);
       const [showRoomModal, setShowRoomModal] = useState(false);
       const [selectedDayIdForActivity, setSelectedDayIdForActivity] = useState(null);
+      const [selectedCronogramaDayId, setSelectedCronogramaDayId] = useState('overview');
       const [toastMessage, setToastMessage] = useState('');
 
       // Asistente IA
@@ -902,20 +903,20 @@
                 </div>
 
                 {activeTab === 'cronograma' && (
-                  <div className="glass-panel p-4 sm:p-6 rounded-3xl space-y-8">
+                  <div className="glass-panel p-4 sm:p-6 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                       <div>
                         <h3 className="font-extrabold text-base sm:text-lg text-slate-100 flex items-center gap-2">
                           <IconCalendar className="w-5 h-5 text-emerald-400" />
-                          Cronograma Paso a Paso por Días
+                          Cronograma & Itinerario por Días
                         </h3>
-                        <p className="text-xs text-slate-400">Itinerario detallado con portada por día, horarios y fotos de cada actividad.</p>
+                        <p className="text-xs text-slate-400">Selecciona un día para desplegar sus actividades paso a paso o navega en las tarjetas.</p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={() => setShowDayModal(true)}
-                          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 whitespace-nowrap"
+                          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all active:scale-95 whitespace-nowrap"
                         >
                           <IconPlus className="w-4 h-4" />
                           <span>+ Agregar Día</span>
@@ -923,16 +924,48 @@
 
                         <button
                           onClick={() => {
-                            setSelectedDayIdForActivity(null);
+                            setSelectedDayIdForActivity(selectedCronogramaDayId !== 'overview' ? selectedCronogramaDayId : null);
                             setShowActivityModal(true);
                           }}
-                          className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 whitespace-nowrap shadow-md shadow-emerald-500/20"
+                          className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all active:scale-95 whitespace-nowrap shadow-md shadow-emerald-500/20"
                         >
                           <IconPlus className="w-4 h-4" />
                           <span>+ Nueva Actividad</span>
                         </button>
                       </div>
                     </div>
+
+                    {/* Barra de Pestañas Rápidas de Días */}
+                    {(activeTrip.days && activeTrip.days.length > 0) && (
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-slate-800/60">
+                        <button
+                          onClick={() => setSelectedCronogramaDayId('overview')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                            selectedCronogramaDayId === 'overview'
+                              ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                          }`}
+                        >
+                          <IconMap className="w-3.5 h-3.5" />
+                          <span>Vista General (Tarjetas)</span>
+                        </button>
+
+                        {activeTrip.days.map((d, dIdx) => (
+                          <button
+                            key={d.id || 'tab-day-' + dIdx}
+                            onClick={() => setSelectedCronogramaDayId(d.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                              selectedCronogramaDayId === d.id
+                                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                            }`}
+                          >
+                            <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                            <span>Día {d.dayNumber || (dIdx + 1)}: {d.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     {(!activeTrip.days || activeTrip.days.length === 0) ? (
                       <div className="py-12 text-center text-slate-500 space-y-4">
@@ -949,182 +982,276 @@
                           Crear Día 1 del Itinerario
                         </button>
                       </div>
-                    ) : (
-                      <div className="space-y-10">
-                        {activeTrip.days.map((day, dayIndex) => {
-                          const dayActivities = day.activities || [];
-                          const dayTotalCost = dayActivities.reduce((acc, curr) => acc + Number(curr.cost || 0), 0);
+                    ) : selectedCronogramaDayId === 'overview' ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                          {activeTrip.days.map((day, dayIndex) => {
+                            const dayActivities = day.activities || [];
+                            const dayTotalCost = dayActivities.reduce((acc, curr) => acc + Number(curr.cost || 0), 0);
 
-                          return (
-                            <div key={day.id || 'day-' + dayIndex} className="space-y-4 bg-slate-950/60 p-4 sm:p-6 rounded-3xl border border-slate-800">
-                              
-                              {/* Portada y Encabezado del Día */}
-                              <div className="relative h-40 sm:h-52 w-full rounded-2xl overflow-hidden border border-slate-800/80 bg-slate-900 group">
-                                <img
-                                  src={day.coverImage || activeTrip.coverImage || PRESET_COVERS[0].url}
-                                  alt={day.title}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-75"
-                                  onError={(e) => { e.target.src = PRESET_COVERS[0].url; }}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+                            return (
+                              <div
+                                key={day.id || 'day-card-' + dayIndex}
+                                onClick={() => setSelectedCronogramaDayId(day.id)}
+                                className="group relative rounded-3xl overflow-hidden cursor-pointer border border-slate-800 hover:border-emerald-500/60 bg-slate-950/80 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-emerald-500/10 flex flex-col justify-between"
+                              >
+                                <div className="h-44 w-full relative overflow-hidden bg-slate-900">
+                                  <img
+                                    src={day.coverImage || activeTrip.coverImage || PRESET_COVERS[0].url}
+                                    alt={day.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80"
+                                    onError={(e) => { e.target.src = PRESET_COVERS[0].url; }}
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
 
-                                <button
-                                  onClick={() => {
-                                    const updatedDays = activeTrip.days.filter(d => d.id !== day.id);
-                                    const updatedTrip = { ...activeTrip, days: updatedDays };
-                                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                    updateTripsList(updatedList);
-                                    showToast(`Día "${day.title}" eliminado.`);
-                                  }}
-                                  className="absolute top-3 right-3 bg-slate-950/80 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-800 p-2 rounded-xl transition-all"
-                                  title="Eliminar Día"
-                                >
-                                  <IconTrash className="w-4 h-4" />
-                                </button>
-
-                                <div className="absolute bottom-4 left-4 right-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="bg-emerald-500 text-slate-950 font-black text-xs px-3 py-0.5 rounded-full uppercase tracking-wider shadow">
-                                        Día {day.dayNumber || (dayIndex + 1)}
+                                  <div className="absolute top-3 left-3 flex items-center gap-2">
+                                    <span className="bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow">
+                                      Día {day.dayNumber || (dayIndex + 1)}
+                                    </span>
+                                    {day.date && (
+                                      <span className="text-[10px] font-mono text-cyan-300 bg-slate-950/80 px-2 py-0.5 rounded-full border border-cyan-500/30 flex items-center gap-1">
+                                        <IconCalendar className="w-3 h-3" />
+                                        {day.date}
                                       </span>
-                                      {day.date && (
-                                        <span className="text-xs font-mono text-cyan-300 bg-slate-900/80 px-2.5 py-0.5 rounded-full border border-cyan-500/30 flex items-center gap-1">
-                                          <IconCalendar className="w-3 h-3" />
-                                          {day.date}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <h4 className="text-lg sm:text-2xl font-extrabold text-white drop-shadow">
+                                    )}
+                                  </div>
+
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const updatedDays = activeTrip.days.filter(d => d.id !== day.id);
+                                      const updatedTrip = { ...activeTrip, days: updatedDays };
+                                      const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                      updateTripsList(updatedList);
+                                      showToast(`Día "${day.title}" eliminado.`);
+                                    }}
+                                    className="absolute top-3 right-3 bg-slate-950/80 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-800 p-2 rounded-xl transition-all"
+                                    title="Eliminar Día"
+                                  >
+                                    <IconTrash className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <div className="absolute bottom-3 left-3 right-3 space-y-1">
+                                    <h4 className="text-base sm:text-lg font-extrabold text-white drop-shadow line-clamp-1 group-hover:text-emerald-300 transition-colors">
                                       {day.title || `Día ${dayIndex + 1}`}
                                     </h4>
+                                    <p className="text-[11px] text-slate-300 font-medium">
+                                      {dayActivities.length} {dayActivities.length === 1 ? 'actividad programada' : 'actividades programadas'}
+                                    </p>
                                   </div>
+                                </div>
 
-                                  <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-xl font-mono text-xs flex items-center justify-between sm:justify-start gap-2">
-                                    <span className="text-slate-400 text-[10px] font-sans uppercase">Total Día:</span>
-                                    <span className="text-emerald-400 font-bold">
-                                      {formatMoney(dayTotalCost, activeTrip.currency)}
-                                    </span>
-                                  </div>
+                                <div className="p-3.5 bg-slate-900/90 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
+                                  <span className="text-slate-400 font-sans text-[11px]">Total del Día:</span>
+                                  <span className="text-emerald-400 font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                                    {formatMoney(dayTotalCost, activeTrip.currency)}
+                                  </span>
                                 </div>
                               </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      (() => {
+                        const selectedDay = activeTrip.days.find(d => d.id === selectedCronogramaDayId) || activeTrip.days[0];
+                        if (!selectedDay) return null;
 
-                              {/* Paso a Paso de Actividades (Línea de Tiempo) */}
-                              {dayActivities.length === 0 ? (
-                                <div className="py-8 text-center bg-slate-900/40 rounded-2xl border border-dashed border-slate-800 space-y-2">
-                                  <p className="text-xs text-slate-400">Sin pasos o actividades agregadas para este día aún.</p>
-                                  <button
-                                    onClick={() => {
-                                      setSelectedDayIdForActivity(day.id);
-                                      setShowActivityModal(true);
-                                    }}
-                                    className="text-xs text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-1"
-                                  >
-                                    <IconPlus className="w-3.5 h-3.5" />
-                                    <span>Agregar primer paso del Día {day.dayNumber || (dayIndex + 1)}</span>
-                                  </button>
+                        const dayIndex = activeTrip.days.findIndex(d => d.id === selectedDay.id);
+                        const dayActivities = selectedDay.activities || [];
+                        const dayTotalCost = dayActivities.reduce((acc, curr) => acc + Number(curr.cost || 0), 0);
+
+                        return (
+                          <div className="space-y-6 bg-slate-950/60 p-4 sm:p-6 rounded-3xl border border-slate-800">
+                            
+                            {/* Botón Volver a Tarjetas */}
+                            <div className="flex items-center justify-between">
+                              <button
+                                onClick={() => setSelectedCronogramaDayId('overview')}
+                                className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-1.5 rounded-xl transition-all"
+                              >
+                                <span>← Volver a Vista de Tarjetas de Días</span>
+                              </button>
+
+                              <span className="text-xs text-slate-400 font-mono">
+                                Mostrando Día {selectedDay.dayNumber || (dayIndex + 1)} de {activeTrip.days.length}
+                              </span>
+                            </div>
+
+                            {/* Portada y Encabezado del Día Seleccionado */}
+                            <div className="relative h-44 sm:h-56 w-full rounded-2xl overflow-hidden border border-slate-800/80 bg-slate-900 group">
+                              <img
+                                src={selectedDay.coverImage || activeTrip.coverImage || PRESET_COVERS[0].url}
+                                alt={selectedDay.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-75"
+                                onError={(e) => { e.target.src = PRESET_COVERS[0].url; }}
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+
+                              <button
+                                onClick={() => {
+                                  const updatedDays = activeTrip.days.filter(d => d.id !== selectedDay.id);
+                                  const updatedTrip = { ...activeTrip, days: updatedDays };
+                                  const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                  updateTripsList(updatedList);
+                                  setSelectedCronogramaDayId('overview');
+                                  showToast(`Día "${selectedDay.title}" eliminado.`);
+                                }}
+                                className="absolute top-3 right-3 bg-slate-950/80 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-800 p-2 rounded-xl transition-all"
+                                title="Eliminar Día"
+                              >
+                                <IconTrash className="w-4 h-4" />
+                              </button>
+
+                              <div className="absolute bottom-4 left-4 right-4 flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="bg-emerald-500 text-slate-950 font-black text-xs px-3 py-0.5 rounded-full uppercase tracking-wider shadow">
+                                      Día {selectedDay.dayNumber || (dayIndex + 1)}
+                                    </span>
+                                    {selectedDay.date && (
+                                      <span className="text-xs font-mono text-cyan-300 bg-slate-900/80 px-2.5 py-0.5 rounded-full border border-cyan-500/30 flex items-center gap-1">
+                                        <IconCalendar className="w-3 h-3" />
+                                        {selectedDay.date}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <h4 className="text-xl sm:text-2xl font-extrabold text-white drop-shadow">
+                                    {selectedDay.title || `Día ${dayIndex + 1}`}
+                                  </h4>
                                 </div>
-                              ) : (
-                                <div className="relative pl-4 sm:pl-8 space-y-6 before:absolute before:left-2 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-800">
-                                  {dayActivities.map((act, actIndex) => (
-                                    <div key={act.id || 'act-' + actIndex} className="relative flex flex-col sm:flex-row gap-4 bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/30 p-4 rounded-2xl transition-all group">
-                                      
-                                      <div className="absolute -left-6 sm:-left-10 top-5 w-5 h-5 rounded-full bg-slate-950 border-2 border-emerald-500 text-emerald-400 font-bold text-[10px] flex items-center justify-center shadow">
-                                        {actIndex + 1}
-                                      </div>
 
-                                      {act.photo && (
-                                        <div className="w-full sm:w-44 h-32 sm:h-32 flex-shrink-0 rounded-xl overflow-hidden bg-slate-950 relative">
-                                          <img
-                                            src={act.photo}
-                                            alt={act.title}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                            onError={(e) => { e.target.style.display = 'none'; }}
-                                          />
-                                        </div>
-                                      )}
-
-                                      <div className="flex-1 space-y-2 flex flex-col justify-between">
-                                        <div className="space-y-1">
-                                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-950 bg-emerald-400 px-2 py-0.5 rounded-md">
-                                                Paso {actIndex + 1}
-                                              </span>
-                                              {act.time && (
-                                                <span className="text-xs font-mono text-cyan-400 flex items-center gap-1 font-semibold">
-                                                  <IconClock className="w-3.5 h-3.5" />
-                                                  {act.time}
-                                                </span>
-                                              )}
-                                              {act.city && (
-                                                <span className="text-xs text-slate-400 flex items-center gap-1">
-                                                  <IconMapPin className="w-3.5 h-3.5 text-slate-500" />
-                                                  {act.city}
-                                                </span>
-                                              )}
-                                            </div>
-
-                                            <span className="font-mono font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-emerald-400">
-                                              {act.cost > 0 ? formatMoney(act.cost, activeTrip.currency) : 'Gratis'}
-                                            </span>
-                                          </div>
-
-                                          <h5 className="font-bold text-sm sm:text-base text-slate-100 group-hover:text-emerald-300 transition-colors pt-0.5">
-                                            {act.title}
-                                          </h5>
-
-                                          {act.notes && (
-                                            <p className="text-xs text-slate-400 leading-relaxed italic bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/60">
-                                              "{act.notes}"
-                                            </p>
-                                          )}
-                                        </div>
-
-                                        <div className="flex justify-end pt-1">
-                                          <button
-                                            onClick={() => {
-                                              const updatedDays = activeTrip.days.map(d => {
-                                                if (d.id === day.id) {
-                                                  return { ...d, activities: d.activities.filter(a => a.id !== act.id) };
-                                                }
-                                                return d;
-                                              });
-                                              const updatedTrip = { ...activeTrip, days: updatedDays };
-                                              const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                              updateTripsList(updatedList);
-                                              showToast("Actividad eliminada.");
-                                            }}
-                                            className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
-                                          >
-                                            <IconTrash className="w-3.5 h-3.5" />
-                                            <span>Eliminar Paso</span>
-                                          </button>
-                                        </div>
-                                      </div>
-
-                                    </div>
-                                  ))}
+                                <div className="bg-slate-900/90 backdrop-blur border border-slate-800 px-3.5 py-1.5 rounded-xl font-mono text-xs flex items-center justify-between sm:justify-start gap-2">
+                                  <span className="text-slate-400 text-[10px] font-sans uppercase">Total Día:</span>
+                                  <span className="text-emerald-400 font-bold">
+                                    {formatMoney(dayTotalCost, activeTrip.currency)}
+                                  </span>
                                 </div>
-                              )}
+                              </div>
+                            </div>
 
-                              <div className="pt-2 flex justify-end">
+                            {/* Paso a Paso de Actividades (Línea de Tiempo) */}
+                            {dayActivities.length === 0 ? (
+                              <div className="py-8 text-center bg-slate-900/40 rounded-2xl border border-dashed border-slate-800 space-y-2">
+                                <p className="text-xs text-slate-400">Sin pasos o actividades agregadas para este día aún.</p>
                                 <button
                                   onClick={() => {
-                                    setSelectedDayIdForActivity(day.id);
+                                    setSelectedDayIdForActivity(selectedDay.id);
                                     setShowActivityModal(true);
                                   }}
-                                  className="text-xs font-bold text-emerald-400 hover:text-emerald-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
+                                  className="text-xs text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-1"
                                 >
                                   <IconPlus className="w-3.5 h-3.5" />
-                                  <span>+ Agregar Paso al Día {day.dayNumber || (dayIndex + 1)}</span>
+                                  <span>Agregar primer paso del Día {selectedDay.dayNumber || (dayIndex + 1)}</span>
                                 </button>
                               </div>
+                            ) : (
+                              <div className="relative pl-4 sm:pl-8 space-y-6 before:absolute before:left-2 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-800">
+                                {dayActivities.map((act, actIndex) => (
+                                  <div key={act.id || 'act-' + actIndex} className="relative flex flex-col sm:flex-row gap-4 bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/30 p-4 rounded-2xl transition-all group">
+                                    
+                                    <div className="absolute -left-6 sm:-left-10 top-5 w-5 h-5 rounded-full bg-slate-950 border-2 border-emerald-500 text-emerald-400 font-bold text-[10px] flex items-center justify-center shadow">
+                                      {actIndex + 1}
+                                    </div>
 
+                                    {act.photo && (
+                                      <div className="w-full sm:w-44 h-32 sm:h-32 flex-shrink-0 rounded-xl overflow-hidden bg-slate-950 relative">
+                                        <img
+                                          src={act.photo}
+                                          alt={act.title}
+                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                          onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                      </div>
+                                    )}
+
+                                    <div className="flex-1 space-y-2 flex flex-col justify-between">
+                                      <div className="space-y-1">
+                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-950 bg-emerald-400 px-2 py-0.5 rounded-md">
+                                              Paso {actIndex + 1}
+                                            </span>
+                                            {act.time && (
+                                              <span className="text-xs font-mono text-cyan-400 flex items-center gap-1 font-semibold">
+                                                <IconClock className="w-3.5 h-3.5" />
+                                                {act.time}
+                                              </span>
+                                            )}
+                                            {act.city && (
+                                              <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                <IconMapPin className="w-3.5 h-3.5 text-slate-500" />
+                                                {act.city}
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <span className="font-mono font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-emerald-400">
+                                            {act.cost > 0 ? formatMoney(act.cost, activeTrip.currency) : 'Gratis'}
+                                          </span>
+                                        </div>
+
+                                        <h5 className="font-bold text-sm sm:text-base text-slate-100 group-hover:text-emerald-300 transition-colors pt-0.5">
+                                          {act.title}
+                                        </h5>
+
+                                        {act.notes && (
+                                          <p className="text-xs text-slate-400 leading-relaxed italic bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/60">
+                                            "{act.notes}"
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      <div className="flex justify-end pt-1">
+                                        <button
+                                          onClick={() => {
+                                            const updatedDays = activeTrip.days.map(d => {
+                                              if (d.id === selectedDay.id) {
+                                                return { ...d, activities: d.activities.filter(a => a.id !== act.id) };
+                                              }
+                                              return d;
+                                            });
+                                            const updatedTrip = { ...activeTrip, days: updatedDays };
+                                            const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                            updateTripsList(updatedList);
+                                            showToast("Actividad eliminada.");
+                                          }}
+                                          className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
+                                        >
+                                          <IconTrash className="w-3.5 h-3.5" />
+                                          <span>Eliminar Paso</span>
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="pt-2 flex justify-between items-center flex-wrap gap-2">
+                              <button
+                                onClick={() => setSelectedCronogramaDayId('overview')}
+                                className="text-xs text-slate-400 hover:text-slate-200"
+                              >
+                                ← Volver a todas las tarjetas
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setSelectedDayIdForActivity(selectedDay.id);
+                                  setShowActivityModal(true);
+                                }}
+                                className="text-xs font-bold text-emerald-400 hover:text-emerald-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
+                              >
+                                <IconPlus className="w-3.5 h-3.5" />
+                                <span>+ Agregar Paso al Día {selectedDay.dayNumber || (dayIndex + 1)}</span>
+                              </button>
                             </div>
-                          );
-                        })}
-                      </div>
+
+                          </div>
+                        );
+                      })()
                     )}
                   </div>
                 )}
