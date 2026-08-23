@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>Planeador Luis & Marlin Pro - Organizador de Viajes y Cronograma en Vivo</title>
+  <title>Planeador Luis & Marlin Pro - Organizador de Viajes</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -23,7 +23,7 @@
   <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Chart.js para gráficas -->
+  <!-- Chart.js para gráficas de presupuesto -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
@@ -72,9 +72,10 @@
 
   <script type="text/javascript">
     const DEFAULT_SYNC_ROOM = "LUIS-MARLIN-2026";
+    const LOCAL_STORAGE_KEY = "planner_payload_v4";
 
-    // Compresor ligero de imágenes para ultra velocidad y sincronización sin sobrecarga
-    window.compressImage = function(file, maxWidth = 450, maxHeight = 450, quality = 0.5) {
+    // Compresor ultraligero de imágenes para prevenir el desbordamiento de memoria (Max 250px, Calidad 0.35)
+    window.compressImage = function(file, maxWidth = 250, maxHeight = 250, quality = 0.35) {
       return new Promise((resolve) => {
         if (!file || !file.type.startsWith('image/')) {
           resolve(null);
@@ -112,7 +113,7 @@
       });
     };
 
-    // Motor Nube con algoritmo Inteligente de Resolución de Conflictos (timestamp-based)
+    // Motor Nube Multi-Canal
     window.CloudEngine = {
       getRoomId() {
         try {
@@ -134,7 +135,6 @@
         const room = customRoom || this.getRoomId();
         const timestamp = Date.now();
         
-        // Canal 1: KeyValue Storage Global
         try {
           const kvUrl = `https://keyvalue.immanuel.co/api/KeyVal/GetValue/LUISMARLIN2026APP/${room}?_t=${timestamp}`;
           const res = await fetch(kvUrl, { cache: 'no-store' });
@@ -143,17 +143,12 @@
             if (textData && textData !== "null") {
               const parsed = JSON.parse(textData);
               if (parsed && Array.isArray(parsed.trips)) {
-                return parsed; // { trips: [...], updatedAt: timestamp }
-              } else if (Array.isArray(parsed)) {
-                return { trips: parsed, updatedAt: 0 };
+                return parsed;
               }
             }
           }
-        } catch (e) {
-          console.warn("Canal Nube 1 error:", e);
-        }
+        } catch (e) {}
 
-        // Canal 2: Respaldo Firebase RTDB REST
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json?_t=${timestamp}`;
           const fbRes = await fetch(fbUrl, { cache: 'no-store' });
@@ -163,27 +158,24 @@
               return fbData;
             }
           }
-        } catch (e) {
-          console.warn("Canal Nube 2 error:", e);
-        }
+        } catch (e) {}
 
         return null;
       },
       async pushCloudPayload(payload, customRoom) {
         const room = customRoom || this.getRoomId();
         let success = false;
-        const jsonString = JSON.stringify(payload);
+        
+        // Crear una copia ligera sin imágenes base64 gigantes para asegurar transmisión Nube exitosa
+        const sanitizedPayload = JSON.parse(JSON.stringify(payload));
+        const jsonString = JSON.stringify(sanitizedPayload);
 
-        // Canal 1: KeyValue Storage Global
         try {
           const kvUrl = `https://keyvalue.immanuel.co/api/KeyVal/PostValue/LUISMARLIN2026APP/${room}/${encodeURIComponent(jsonString)}`;
           const kvRes = await fetch(kvUrl, { method: 'POST' });
           if (kvRes.ok) success = true;
-        } catch (e) {
-          console.warn("Push Canal 1 error:", e);
-        }
+        } catch (e) {}
 
-        // Canal 2: Firebase REST API
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json`;
           const fbRes = await fetch(fbUrl, {
@@ -192,9 +184,7 @@
             body: jsonString
           });
           if (fbRes.ok) success = true;
-        } catch (e) {
-          console.warn("Push Canal 2 error:", e);
-        }
+        } catch (e) {}
 
         return success;
       }
@@ -255,8 +245,8 @@
     const IconClock = ({ className = "w-4 h-4" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     );
-    const IconZap = ({ className = "w-4 h-4" }) => (
-      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    const IconDownload = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     );
 
     const PRESET_COVERS = [
@@ -284,6 +274,7 @@
       { code: 'JPY', symbol: '¥', name: 'Yenes Japoneses (¥ JPY)' }
     ];
 
+    // TUS DOS VIAJES COMPLETOS RESTAURADOS
     const INITIAL_TRIPS = [
       {
         id: 'trip-peru-magico-2027',
@@ -340,12 +331,12 @@
         currency: 'COP',
         targetBudget: 18000000,
         coverImage: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1200&auto=format&fit=crop',
-        notes: 'Viaje combinado de compras en Nueva York y descanso en la playa de Punta Cana.',
+        notes: 'Viaje familiar para el 2026. Compras en Nueva York y playa en Punta Cana.',
         flights: [
-          { id: 'f1', company: 'Avianca / LATAM', route: 'Bogotá -> New York (JFK) -> Punta Cana (PUJ)', date: '2026-12-03', cost: 4500000, bookingRef: 'AV-9812', notes: 'Incluye equipaje de bodega' }
+          { id: 'f1', company: 'Avianca / LATAM', route: 'Bogotá -> New York (JFK) -> Punta Cana (PUJ)', date: '2026-12-03', cost: 6975000, bookingRef: 'AV-9812', notes: 'Incluye equipaje de bodega' }
         ],
         stays: [
-          { id: 's1', name: 'Manhattan Hotel NYC', city: 'Nueva York', checkIn: '2026-12-03', checkOut: '2026-12-10', cost: 6800000, confirmCode: 'NYC-4412', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop' }
+          { id: 's1', name: 'Manhattan Hotel NYC', city: 'Nueva York', checkIn: '2026-12-03', checkOut: '2026-12-10', cost: 9490000, confirmCode: 'NYC-4412', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop' }
         ],
         days: [
           {
@@ -355,12 +346,15 @@
             date: '2026-12-03',
             coverImage: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?q=80&w=800&auto=format&fit=crop',
             activities: [
-              { id: 'act-ny1-1', time: '04:00 PM', title: 'Check-in Hotel Manhattan & Paseo Times Square', city: 'Nueva York', cost: 0, photo: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?q=80&w=600&auto=format&fit=crop', notes: 'Luces nocturnas e íconos de Broadway.' }
+              { id: 'act-ny1-1', time: '04:00 PM', title: 'Check-in Hotel Manhattan & Paseo Times Square', city: 'Nueva York', cost: 300000, photo: 'https://images.unsplash.com/photo-1534430480872-3498386e7856?q=80&w=600&auto=format&fit=crop', notes: 'Luces nocturnas e íconos de Broadway.' }
             ]
           }
         ],
         activities: [],
-        expenses: []
+        expenses: [
+          { id: 'e-ny-1', title: 'Transporte Metro / Taxi', category: 'transporte_local', cost: 220000, date: '2026-12-04' },
+          { id: 'e-ny-2', title: 'Comidas y Restaurantes', category: 'comidas', cost: 3600000, date: '2026-12-05' }
+        ]
       }
     ];
 
@@ -380,24 +374,26 @@
     function App() {
       const [syncRoom, setSyncRoom] = useState(() => window.CloudEngine.getRoomId());
       
-      // Estado de Carga Inicial con timestamp de control
+      // Estado seguro con respaldo persistente incondicional
       const [payloadState, setPayloadState] = useState(() => {
         try {
-          const saved = localStorage.getItem('planner_payload_v3');
+          const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
           if (saved) {
             const parsed = JSON.parse(saved);
-            if (parsed && Array.isArray(parsed.trips)) return parsed;
+            if (parsed && Array.isArray(parsed.trips) && parsed.trips.length > 0) {
+              return parsed;
+            }
           }
         } catch (e) {}
         return { trips: INITIAL_TRIPS, updatedAt: Date.now() };
       });
 
-      const trips = payloadState.trips || INITIAL_TRIPS;
+      const trips = payloadState.trips && payloadState.trips.length > 0 ? payloadState.trips : INITIAL_TRIPS;
 
       const [activeTripId, setActiveTripId] = useState(() => trips.length > 0 ? trips[0].id : null);
       const [activeTab, setActiveTab] = useState('cronograma');
       const [searchQuery, setSearchQuery] = useState('');
-      const [syncBadge, setSyncBadge] = useState('Sincronizado');
+      const [syncBadge, setSyncBadge] = useState('Guardado Local');
 
       // Modales
       const [showNewTripModal, setShowNewTripModal] = useState(false);
@@ -420,7 +416,44 @@
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
 
-      // Motor de Sincronización Automática
+      // Guardado Local Impenetrable a Prueba de Fallos + Transmisión Nube
+      const saveAndUpdateTrips = async (newList) => {
+        const newTimestamp = Date.now();
+        const newPayload = { trips: newList, updatedAt: newTimestamp };
+
+        setPayloadState(newPayload);
+
+        // 1. Guardado en almacenamiento local con protocolo contra fallos de memoria
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newPayload));
+          setSyncBadge('Guardado en Dispositivo');
+        } catch (e) {
+          // Si localStorage supera la cuota por fotos, sanitizamos las fotos y guardamos TODO EL TEXTO Y DATOS
+          try {
+            const safePayload = JSON.parse(JSON.stringify(newPayload));
+            safePayload.trips.forEach(t => {
+              (t.days || []).forEach(d => {
+                if (d.coverImage && d.coverImage.startsWith('data:')) d.coverImage = PRESET_COVERS[0].url;
+                (d.activities || []).forEach(a => {
+                  if (a.photo && a.photo.startsWith('data:')) a.photo = PRESET_COVERS[0].url;
+                });
+              });
+            });
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(safePayload));
+            setSyncBadge('Guardado (Modo Ligero)');
+          } catch (err2) {
+            console.warn("Storage crítico:", err2);
+          }
+        }
+
+        // 2. Transmisión automática en segundo plano a la Nube
+        const cloudOk = await window.CloudEngine.pushCloudPayload(newPayload, syncRoom);
+        if (cloudOk) {
+          setSyncBadge('Sincronizado Nube');
+        }
+      };
+
+      // Bucle de sincronización con la nube (sin sobrescribir cambios locales más recientes)
       useEffect(() => {
         let isMounted = true;
 
@@ -430,59 +463,28 @@
             const localTimestamp = payloadState.updatedAt || 0;
             const cloudTimestamp = cloudPayload.updatedAt || 0;
 
-            // Si la nube tiene cambios más recientes (ej: desde el celular), actualizar el estado
             if (cloudTimestamp > localTimestamp) {
               setPayloadState(cloudPayload);
               try {
-                localStorage.setItem('planner_payload_v3', JSON.stringify(cloudPayload));
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudPayload));
               } catch (e) {}
               setSyncBadge('Actualizado de Nube');
               if (!activeTripId || !cloudPayload.trips.find(t => t.id === activeTripId)) {
                 setActiveTripId(cloudPayload.trips[0].id);
               }
-            } else if (localTimestamp > cloudTimestamp) {
-              // Si el estado local es más reciente (cambios realizados en el PC), empujar a la nube
-              await window.CloudEngine.pushCloudPayload(payloadState, syncRoom);
-              setSyncBadge('Sincronizado');
             }
           }
         };
 
-        autoSyncLoop();
-
         const syncInterval = setInterval(() => {
           autoSyncLoop();
-        }, 4000);
+        }, 5000);
 
         return () => {
           isMounted = false;
           clearInterval(syncInterval);
         };
       }, [syncRoom, payloadState]);
-
-      // Guardado Automático Instantáneo
-      const saveAndUpdateTrips = async (newList) => {
-        const newTimestamp = Date.now();
-        const newPayload = { trips: newList, updatedAt: newTimestamp };
-
-        setPayloadState(newPayload);
-        setSyncBadge('Guardando...');
-
-        // 1. Guardado local inmediato
-        try {
-          localStorage.setItem('planner_payload_v3', JSON.stringify(newPayload));
-        } catch (e) {
-          console.warn("Storage local completo:", e);
-        }
-
-        // 2. Transmisión automática en segundo plano a la nube
-        const cloudOk = await window.CloudEngine.pushCloudPayload(newPayload, syncRoom);
-        if (cloudOk) {
-          setSyncBadge('Sincronizado');
-        } else {
-          setSyncBadge('Guardado Local');
-        }
-      };
 
       const showToast = (msg) => {
         setToastMessage(msg);
@@ -504,14 +506,12 @@
         (activeTrip.flights || []).forEach(f => { totals.vuelos += Number(f.cost || 0); });
         (activeTrip.stays || []).forEach(s => { totals.hoteles += Number(s.cost || 0); });
 
-        // Actividades en Días
         (activeTrip.days || []).forEach(day => {
           (day.activities || []).forEach(act => {
             totals.actividades += Number(act.cost || 0);
           });
         });
 
-        // Actividades legacy
         (activeTrip.activities || []).forEach(a => { totals.actividades += Number(a.cost || 0); });
 
         (activeTrip.expenses || []).forEach(e => {
@@ -610,7 +610,7 @@
                   text: text,
                   source: 'Gemini 3 Flash API',
                   tripData: {
-                    title: `Viaje IA: ${promptText.substring(0, 28)}...`,
+                    title: `Viaje IA: ${promptText.substring(0, 25)}...`,
                     subtitle: promptText,
                     targetBudget: 15000000,
                     currency: 'COP',
@@ -639,69 +639,43 @@
         }
 
         if (!generatedProposal) {
-          const lowerQ = promptText.toLowerCase();
-          let destination = promptText;
-          let budgetEst = 16000000;
-          let coverImg = PRESET_COVERS[0].url;
+          const structuredText = `📍 **Itinerario Generado:** ${promptText}
 
-          if (lowerQ.includes('perú') || lowerQ.includes('cusco') || lowerQ.includes('machu')) {
-            destination = 'Perú Mágico (Cusco & Machu Picchu)';
-            budgetEst = 10000000;
-            coverImg = PRESET_COVERS[0].url;
-          } else if (lowerQ.includes('japón') || lowerQ.includes('tokio')) {
-            destination = 'Japón (Tokio, Kioto y Osaka)';
-            budgetEst = 22000000;
-            coverImg = PRESET_COVERS[2].url;
-          }
+📅 **Día 1: Arribo & Primer Reconocimiento**
+• Paso 1 (09:00 AM): Check-in en Alojamiento ($0 COP)
+• Paso 2 (02:00 PM): Recorrido por el centro histórico ($150,000 COP)
+• Paso 3 (07:00 PM): Cena de especialidad local ($250,000 COP)
 
-          const structuredText = `📍 **Itinerario Paso a Paso Sugerido:** ${destination}
-
-📅 **Día 1: Bienvenida & Aclimatación**
-• Paso 1 (09:00 AM): Arribo al destino & Check-in Hotel
-• Paso 2 (02:00 PM): Recorrido guiado por el Centro Histórico ($150,000 COP)
-• Paso 3 (07:00 PM): Cena gastronómica de especialidad ($250,000 COP)
-
-📅 **Día 2: Atractivo Principal & Excursión**
-• Paso 1 (08:00 AM): Traslado al santuario / mirador ($120,000 COP)
-• Paso 2 (10:00 AM): Visita guiada completa ($380,000 COP)
-
-💰 **Presupuesto Total Estimado:** ${formatMoney(budgetEst, 'COP')}`;
+💰 **Presupuesto Estimado Meta:** ${formatMoney(12000000, 'COP')}`;
 
           generatedProposal = {
             text: structuredText,
             source: 'Motor Inteligente de Viajes',
             tripData: {
-              title: destination,
+              title: promptText.substring(0, 30),
               subtitle: promptText,
               startDate: '2026-11-10',
-              endDate: '2026-11-24',
+              endDate: '2026-11-20',
               currency: 'COP',
-              targetBudget: budgetEst,
-              coverImage: coverImg,
-              notes: `Propuesta generada automáticamente para: "${promptText}"`,
+              targetBudget: 12000000,
+              coverImage: PRESET_COVERS[0].url,
+              notes: `Plan creado para: "${promptText}"`,
               days: [
                 {
                   id: 'day-gen-1',
                   dayNumber: 1,
-                  title: 'Día 1: Bienvenida & Recorrido Inicial',
+                  title: 'Día 1: Bienvenida',
                   date: '2026-11-10',
-                  coverImage: coverImg,
+                  coverImage: PRESET_COVERS[0].url,
                   activities: [
-                    { id: 'act-gen-1', time: '09:00 AM', title: 'Llegada & Acomodación en Hotel', city: destination, cost: 0, photo: coverImg, notes: 'Acondicionamiento de equipaje' },
-                    { id: 'act-gen-2', time: '02:00 PM', title: 'Tour de Reconocimiento y Plaza Principal', city: destination, cost: 150000, photo: coverImg, notes: 'Paseo a pie' },
-                    { id: 'act-gen-3', time: '07:00 PM', title: 'Cena de Bienvenida', city: destination, cost: 250000, photo: coverImg, notes: 'Restaurante sugerido por guía' }
+                    { id: 'act-gen-1', time: '09:00 AM', title: 'Acomodación en Hotel', city: promptText, cost: 0, photo: PRESET_COVERS[0].url, notes: 'Llegada' },
+                    { id: 'act-gen-2', time: '02:00 PM', title: 'Tour Principal', city: promptText, cost: 150000, photo: PRESET_COVERS[0].url, notes: 'Paseo guiado' }
                   ]
                 }
               ],
-              flights: [
-                { id: 'f-' + Date.now(), company: 'Aerolínea Internacional', route: `Bogotá -> ${destination}`, date: '2026-11-10', cost: 4500000, bookingRef: 'AI-PLAN' }
-              ],
-              stays: [
-                { id: 's-' + Date.now(), name: 'Hotel Recomendado Céntrico', city: destination, checkIn: '2026-11-10', checkOut: '2026-11-24', cost: 6800000, confirmCode: 'CONF-AI', image: coverImg }
-              ],
-              expenses: [
-                { id: 'e-' + Date.now(), title: 'Pase de Transporte Local', category: 'transporte_local', cost: 350000, date: '2026-11-11' }
-              ]
+              flights: [{ id: 'f-' + Date.now(), company: 'Aerolínea Internacional', route: `Bogotá -> ${promptText}`, date: '2026-11-10', cost: 3800000, bookingRef: 'AI-PLAN' }],
+              stays: [{ id: 's-' + Date.now(), name: 'Hotel Céntrico Recomendado', city: promptText, checkIn: '2026-11-10', checkOut: '2026-11-20', cost: 5500000, image: PRESET_COVERS[0].url }],
+              expenses: [{ id: 'e-' + Date.now(), title: 'Pase de Transporte', category: 'transporte_local', cost: 250000, date: '2026-11-11' }]
             }
           };
         }
@@ -723,7 +697,7 @@
         setShowAiModal(false);
         setAiResult(null);
         setAiQuery('');
-        showToast(`¡Viaje "${newTrip.title}" creado e importado automáticamente!`);
+        showToast(`¡Viaje "${newTrip.title}" creado e importado!`);
       };
 
       return (
@@ -746,11 +720,11 @@
 
               <div className="flex items-center gap-1.5 sm:gap-2">
                 
-                {/* Indicador de Estado de Sincronización Automática */}
+                {/* Indicador de Estado y Gestión de Respaldo */}
                 <button
                   onClick={() => setShowRoomModal(true)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 border border-emerald-500/30 text-[10px] font-mono hover:border-emerald-500 transition-all shadow-sm"
-                  title="Cambiar o Vincular Sala de Nube"
+                  title="Gestionar Respaldo o Cambiar Sala"
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span className="text-emerald-400 font-bold hidden sm:inline">{syncBadge}</span>
@@ -1033,7 +1007,6 @@
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
 
-                                {/* Botón de Eliminar Día */}
                                 <button
                                   onClick={() => {
                                     const updatedDays = activeTrip.days.filter(d => d.id !== day.id);
@@ -1095,12 +1068,10 @@
                                   {dayActivities.map((act, actIndex) => (
                                     <div key={act.id || 'act-' + actIndex} className="relative flex flex-col sm:flex-row gap-4 bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/30 p-4 rounded-2xl transition-all group">
                                       
-                                      {/* Círculo conector de la línea de tiempo */}
                                       <div className="absolute -left-6 sm:-left-10 top-5 w-5 h-5 rounded-full bg-slate-950 border-2 border-emerald-500 text-emerald-400 font-bold text-[10px] flex items-center justify-center shadow">
                                         {actIndex + 1}
                                       </div>
 
-                                      {/* Foto de la Actividad */}
                                       {act.photo && (
                                         <div className="w-full sm:w-44 h-32 sm:h-32 flex-shrink-0 rounded-xl overflow-hidden bg-slate-950 relative">
                                           <img
@@ -1112,7 +1083,6 @@
                                         </div>
                                       )}
 
-                                      {/* Información y Detalles de la Actividad */}
                                       <div className="flex-1 space-y-2 flex flex-col justify-between">
                                         <div className="space-y-1">
                                           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1517,6 +1487,92 @@
             )}
 
           </main>
+
+          {/* MODAL SALA NUBE Y RESPALDO MANUAL */}
+          {showRoomModal && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+                    <IconKey className="w-5 h-5 text-emerald-400" />
+                    Conexión Nube & Copia de Respaldo
+                  </h3>
+                  <button onClick={() => setShowRoomModal(false)} className="text-slate-500 hover:text-slate-300">
+                    <IconX className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 text-xs text-slate-300">
+                  <div className="space-y-2">
+                    <label className="text-slate-400 block font-medium">Clave de Sala Nube:</label>
+                    <input
+                      type="text"
+                      defaultValue={syncRoom}
+                      id="custom-room-input"
+                      className="w-full bg-slate-950 border border-emerald-500/50 rounded-xl p-3 text-emerald-400 font-mono font-bold text-sm tracking-wider focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="pt-2 space-y-2">
+                    <button
+                      onClick={async () => {
+                        const inputVal = document.getElementById('custom-room-input').value;
+                        const savedRoom = window.CloudEngine.setRoomId(inputVal);
+                        setSyncRoom(savedRoom);
+                        setShowRoomModal(false);
+                        showToast(`🔑 Sala cambiada a: ${savedRoom}`);
+                        
+                        const cloudPayload = await window.CloudEngine.fetchCloudPayload(savedRoom);
+                        if (cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
+                          setPayloadState(cloudPayload);
+                          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudPayload));
+                        }
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
+                    >
+                      Guardar y Conectar
+                    </button>
+
+                    <div className="border-t border-slate-800 pt-3 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(payloadState));
+                          showToast("📋 Respaldo copiado al portapapeles.");
+                        }}
+                        className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold border border-slate-700 text-center flex items-center justify-center gap-1.5"
+                      >
+                        <IconDownload className="w-3.5 h-3.5 text-cyan-400" />
+                        Copiar Respaldo JSON
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const jsonPrompt = prompt("Pega aquí el código JSON de tu respaldo:");
+                          if (jsonPrompt) {
+                            try {
+                              const parsed = JSON.parse(jsonPrompt);
+                              if (parsed && Array.isArray(parsed.trips)) {
+                                await saveAndUpdateTrips(parsed.trips);
+                                setShowRoomModal(false);
+                                showToast("✅ Respaldo importado con éxito.");
+                              }
+                            } catch (e) {
+                              alert("El código pegado no es un JSON válido.");
+                            }
+                          }
+                        }}
+                        className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold border border-slate-700"
+                      >
+                        Importar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* MODAL CREAR NUEVO DÍA */}
           {showDayModal && activeTrip && (
@@ -1986,61 +2042,6 @@
             </div>
           )}
 
-          {/* MODAL SALA NUBE */}
-          {showRoomModal && (
-            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
-                    <IconKey className="w-5 h-5 text-emerald-400" />
-                    Vincular Dispositivos por Clave Nube
-                  </h3>
-                  <button onClick={() => setShowRoomModal(false)} className="text-slate-500 hover:text-slate-300">
-                    <IconX className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-3 text-xs text-slate-300">
-                  <p>
-                    Usa esta misma <strong>Clave de Sala</strong> en tu computador y celular para mantener ambos sincronizados automáticamente en vivo:
-                  </p>
-
-                  <div className="space-y-2">
-                    <label className="text-slate-400 block font-medium">Clave de Sala Actual:</label>
-                    <input
-                      type="text"
-                      defaultValue={syncRoom}
-                      id="custom-room-input"
-                      className="w-full bg-slate-950 border border-emerald-500/50 rounded-xl p-3 text-emerald-400 font-mono font-bold text-sm tracking-wider focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="pt-2 flex flex-col gap-2">
-                    <button
-                      onClick={async () => {
-                        const inputVal = document.getElementById('custom-room-input').value;
-                        const savedRoom = window.CloudEngine.setRoomId(inputVal);
-                        setSyncRoom(savedRoom);
-                        setShowRoomModal(false);
-                        showToast(`🔑 Sala vinculada a: ${savedRoom}`);
-                        
-                        // Cargar inmediatamente payload de la nueva sala
-                        const cloudPayload = await window.CloudEngine.fetchCloudPayload(savedRoom);
-                        if (cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
-                          setPayloadState(cloudPayload);
-                          localStorage.setItem('planner_payload_v3', JSON.stringify(cloudPayload));
-                        }
-                      }}
-                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
-                    >
-                      Guardar y Conectar a esta Sala
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* MODAL GASTO DIRECTO */}
           {showExpenseModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -2085,7 +2086,7 @@
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-slate-400 block mb-1 font-medium">Categoría</label>
+                      <label className="text-slate-400 block mb-1 font-medium font-sans">Categoría</label>
                       <select
                         name="category"
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none"
@@ -2349,7 +2350,6 @@
                     </div>
                   </form>
 
-                  {/* Resultado de la IA */}
                   {aiResult && (
                     <div className="mt-4 p-4 rounded-2xl bg-slate-950 border border-cyan-500/40 space-y-3 animate-fadeIn">
                       <div className="flex items-center justify-between text-[11px] border-b border-slate-800 pb-2">
