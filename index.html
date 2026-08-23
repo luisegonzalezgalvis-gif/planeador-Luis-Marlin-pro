@@ -72,9 +72,9 @@
 
   <script type="text/javascript">
     const DEFAULT_SYNC_ROOM = "LUIS-MARLIN-2026";
-    const LOCAL_STORAGE_KEY = "planner_payload_v4";
+    const LOCAL_STORAGE_KEY = "planner_payload_v5";
 
-    // Compresor ultraligero de imágenes para prevenir el desbordamiento de memoria (Max 250px, Calidad 0.35)
+    // Compresor ultraligero de imágenes
     window.compressImage = function(file, maxWidth = 250, maxHeight = 250, quality = 0.35) {
       return new Promise((resolve) => {
         if (!file || !file.type.startsWith('image/')) {
@@ -113,7 +113,7 @@
       });
     };
 
-    // Motor Nube Multi-Canal
+    // Motor Nube Multi-Canal con petición POST en Body
     window.CloudEngine = {
       getRoomId() {
         try {
@@ -136,25 +136,11 @@
         const timestamp = Date.now();
         
         try {
-          const kvUrl = `https://keyvalue.immanuel.co/api/KeyVal/GetValue/LUISMARLIN2026APP/${room}?_t=${timestamp}`;
-          const res = await fetch(kvUrl, { cache: 'no-store' });
-          if (res.ok) {
-            const textData = await res.text();
-            if (textData && textData !== "null") {
-              const parsed = JSON.parse(textData);
-              if (parsed && Array.isArray(parsed.trips)) {
-                return parsed;
-              }
-            }
-          }
-        } catch (e) {}
-
-        try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json?_t=${timestamp}`;
           const fbRes = await fetch(fbUrl, { cache: 'no-store' });
           if (fbRes.ok) {
             const fbData = await fbRes.json();
-            if (fbData && Array.isArray(fbData.trips)) {
+            if (fbData && Array.isArray(fbData.trips) && fbData.trips.length > 0) {
               return fbData;
             }
           }
@@ -165,16 +151,7 @@
       async pushCloudPayload(payload, customRoom) {
         const room = customRoom || this.getRoomId();
         let success = false;
-        
-        // Crear una copia ligera sin imágenes base64 gigantes para asegurar transmisión Nube exitosa
-        const sanitizedPayload = JSON.parse(JSON.stringify(payload));
-        const jsonString = JSON.stringify(sanitizedPayload);
-
-        try {
-          const kvUrl = `https://keyvalue.immanuel.co/api/KeyVal/PostValue/LUISMARLIN2026APP/${room}/${encodeURIComponent(jsonString)}`;
-          const kvRes = await fetch(kvUrl, { method: 'POST' });
-          if (kvRes.ok) success = true;
-        } catch (e) {}
+        const jsonString = JSON.stringify(payload);
 
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json`;
@@ -274,7 +251,6 @@
       { code: 'JPY', symbol: '¥', name: 'Yenes Japoneses (¥ JPY)' }
     ];
 
-    // TUS DOS VIAJES COMPLETOS RESTAURADOS
     const INITIAL_TRIPS = [
       {
         id: 'trip-peru-magico-2027',
@@ -373,8 +349,9 @@
 
     function App() {
       const [syncRoom, setSyncRoom] = useState(() => window.CloudEngine.getRoomId());
+      const lastLocalUpdateRef = useRef(0);
       
-      // Estado seguro con respaldo persistente incondicional
+      // Estado seguro con respaldo local primario
       const [payloadState, setPayloadState] = useState(() => {
         try {
           const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -416,54 +393,49 @@
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
 
-      // Guardado Local Impenetrable a Prueba de Fallos + Transmisión Nube
+      // Guardado Local Primario y Sincronización
       const saveAndUpdateTrips = async (newList) => {
         const newTimestamp = Date.now();
+        lastLocalUpdateRef.current = newTimestamp;
+        
         const newPayload = { trips: newList, updatedAt: newTimestamp };
 
+        // 1. Actualizar estado e inmediatamente escribir a LocalStorage de forma síncrona
         setPayloadState(newPayload);
 
-        // 1. Guardado en almacenamiento local con protocolo contra fallos de memoria
         try {
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newPayload));
           setSyncBadge('Guardado en Dispositivo');
         } catch (e) {
-          // Si localStorage supera la cuota por fotos, sanitizamos las fotos y guardamos TODO EL TEXTO Y DATOS
-          try {
-            const safePayload = JSON.parse(JSON.stringify(newPayload));
-            safePayload.trips.forEach(t => {
-              (t.days || []).forEach(d => {
-                if (d.coverImage && d.coverImage.startsWith('data:')) d.coverImage = PRESET_COVERS[0].url;
-                (d.activities || []).forEach(a => {
-                  if (a.photo && a.photo.startsWith('data:')) a.photo = PRESET_COVERS[0].url;
-                });
-              });
-            });
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(safePayload));
-            setSyncBadge('Guardado (Modo Ligero)');
-          } catch (err2) {
-            console.warn("Storage crítico:", err2);
-          }
+          console.warn("Storage warning:", e);
         }
 
-        // 2. Transmisión automática en segundo plano a la Nube
-        const cloudOk = await window.CloudEngine.pushCloudPayload(newPayload, syncRoom);
-        if (cloudOk) {
-          setSyncBadge('Sincronizado Nube');
-        }
+        // 2. Transmisión a la Nube
+        try {
+          const cloudOk = await window.CloudEngine.pushCloudPayload(newPayload, syncRoom);
+          if (cloudOk) {
+            setSyncBadge('Sincronizado Nube');
+          }
+        } catch (e) {}
       };
 
-      // Bucle de sincronización con la nube (sin sobrescribir cambios locales más recientes)
+      // Control de lectura desde la nube
       useEffect(() => {
         let isMounted = true;
 
         const autoSyncLoop = async () => {
+          // Si hubo edición local hace menos de 10 segundos, omitir la lectura remota
+          if (Date.now() - lastLocalUpdateRef.current < 10000) {
+            return;
+          }
+
           const cloudPayload = await window.CloudEngine.fetchCloudPayload(syncRoom);
           if (isMounted && cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
             const localTimestamp = payloadState.updatedAt || 0;
             const cloudTimestamp = cloudPayload.updatedAt || 0;
 
-            if (cloudTimestamp > localTimestamp) {
+            // Únicamente actualizar si la nube tiene un timestamp estrictamente mayor (+2 segundos)
+            if (cloudTimestamp > localTimestamp + 2000) {
               setPayloadState(cloudPayload);
               try {
                 localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudPayload));
@@ -476,15 +448,13 @@
           }
         };
 
-        const syncInterval = setInterval(() => {
-          autoSyncLoop();
-        }, 5000);
+        const syncInterval = setInterval(autoSyncLoop, 8000);
 
         return () => {
           isMounted = false;
           clearInterval(syncInterval);
         };
-      }, [syncRoom, payloadState]);
+      }, [syncRoom, payloadState.updatedAt]);
 
       const showToast = (msg) => {
         setToastMessage(msg);
@@ -719,8 +689,6 @@
               </div>
 
               <div className="flex items-center gap-1.5 sm:gap-2">
-                
-                {/* Indicador de Estado y Gestión de Respaldo */}
                 <button
                   onClick={() => setShowRoomModal(true)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 border border-emerald-500/30 text-[10px] font-mono hover:border-emerald-500 transition-all shadow-sm"
@@ -939,7 +907,7 @@
                   </div>
                 </div>
 
-                {/* TAB CRONOGRAMA Y ACTIVIDADES PASO A PASO POR DÍAS */}
+                {/* TAB CRONOGRAMA */}
                 {activeTab === 'cronograma' && (
                   <div className="glass-panel p-4 sm:p-6 rounded-3xl space-y-8">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
