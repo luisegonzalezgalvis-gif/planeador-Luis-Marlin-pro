@@ -72,8 +72,8 @@
     const DEFAULT_SYNC_ROOM = "LUIS-MARLIN-2026";
     const MASTER_STORAGE_KEY = "luis_marlin_trips_master_v10";
 
-    // Compresor de imágenes optimizado para conservar nitidez
-    window.compressImage = function(file, maxWidth = 1600, maxHeight = 900, quality = 0.8) {
+    // Compresor de imágenes para evitar fallos de envío en Firebase / LocalStorage
+    window.compressImage = function(file, maxWidth = 1200, maxHeight = 700, quality = 0.75) {
       return new Promise((resolve) => {
         if (!file || !file.type || !file.type.startsWith('image/')) {
           resolve(null);
@@ -111,7 +111,6 @@
       });
     };
 
-    // Motor Nube con respaldo en Firebase RTDB
     window.CloudEngine = {
       getRoomId() {
         try {
@@ -129,9 +128,29 @@
           return DEFAULT_SYNC_ROOM;
         }
       },
+      sanitizeTrips(trips) {
+        return (trips || []).map(t => ({
+          ...t,
+          coverImage: (t.coverImage && t.coverImage.length > 250000) ? '' : t.coverImage,
+          days: (t.days || []).map(d => ({
+            ...d,
+            coverImage: (d.coverImage && d.coverImage.length > 250000) ? '' : d.coverImage,
+            activities: (d.activities || []).map(a => ({
+              ...a,
+              photo: (a.photo && a.photo.length > 250000) ? '' : a.photo
+            }))
+          })),
+          stays: (t.stays || []).map(s => ({
+            ...s,
+            image: (s.image && s.image.length > 250000) ? '' : s.image
+          }))
+        }));
+      },
       async fetchCloudPayload(customRoom) {
         const room = customRoom || this.getRoomId();
         const timestamp = Date.now();
+
+        // 1. Firebase RTDB
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json?_t=${timestamp}`;
           const fbRes = await fetch(fbUrl, { cache: 'no-store' });
@@ -142,20 +161,77 @@
             }
           }
         } catch (e) {}
+
+        // 2. KVDB Fallback
+        try {
+          const kvUrl = `https://kvdb.io/6W3s1v9Y8pQz2x4M7k/room_${room}?_t=${timestamp}`;
+          const kvRes = await fetch(kvUrl, { cache: 'no-store' });
+          if (kvRes.ok) {
+            const kvData = await kvRes.json();
+            if (kvData && Array.isArray(kvData.trips) && kvData.trips.length > 0) {
+              return kvData;
+            }
+          }
+        } catch (e) {}
+
+        // 3. Restful-API object store fallback
+        try {
+          const restUrl = `https://api.restful-api.dev/objects?_t=${timestamp}`;
+          const restRes = await fetch(restUrl, { cache: 'no-store' });
+          if (restRes.ok) {
+            const list = await restRes.json();
+            const found = list.find(item => item.name === `room_${room}`);
+            if (found && found.data && Array.isArray(found.data.trips) && found.data.trips.length > 0) {
+              return found.data;
+            }
+          }
+        } catch (e) {}
+
         return null;
       },
       async pushCloudPayload(payload, customRoom) {
         const room = customRoom || this.getRoomId();
+        const cleanTrips = this.sanitizeTrips(payload.trips);
+        const cleanPayload = { trips: cleanTrips, updatedAt: payload.updatedAt || Date.now() };
+
         let success = false;
+
+        // 1. Firebase RTDB
         try {
           const fbUrl = `https://planeador-luis-marlin-default-rtdb.firebaseio.com/rooms/${room}.json`;
           const fbRes = await fetch(fbUrl, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(cleanPayload)
           });
           if (fbRes.ok) success = true;
         } catch (e) {}
+
+        // 2. KVDB Fallback
+        try {
+          const kvUrl = `https://kvdb.io/6W3s1v9Y8pQz2x4M7k/room_${room}`;
+          const kvRes = await fetch(kvUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cleanPayload)
+          });
+          if (kvRes.ok) success = true;
+        } catch (e) {}
+
+        // 3. REST API Object Store Fallback
+        try {
+          const restUrl = `https://api.restful-api.dev/objects`;
+          const restRes = await fetch(restUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: `room_${room}`,
+              data: cleanPayload
+            })
+          });
+          if (restRes.ok) success = true;
+        } catch (e) {}
+
         return success;
       }
     };
@@ -215,13 +291,16 @@
     const IconClock = ({ className = "w-4 h-4" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     );
+    const IconRefresh = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+    );
 
     const PRESET_COVERS = [
+      { name: "Boyacá & Villa de Leyva", url: "https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=1600&auto=format&fit=crop" },
       { name: "Perú & Machu Picchu HD", url: "https://images.unsplash.com/photo-1526392060635-9d6019884377?q=80&w=1600&auto=format&fit=crop" },
       { name: "Nueva York - Brooklyn HD", url: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=1600&auto=format&fit=crop" },
       { name: "Punta Cana - Playa HD", url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1600&auto=format&fit=crop" },
       { name: "Japón (Tokio / Kioto) HD", url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=1600&auto=format&fit=crop" },
-      { name: "China (Muralla) HD", url: "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?q=80&w=1600&auto=format&fit=crop" },
       { name: "Europa (París / Roma) HD", url: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=1600&auto=format&fit=crop" }
     ];
 
@@ -244,49 +323,70 @@
 
     const INITIAL_TRIPS = [
       {
+        id: 'trip-boyaca-2026',
+        title: 'Boyacá de ensueño',
+        subtitle: 'Villa de Leyva, Ráquira, Moniquirá, Sutamarchán',
+        startDate: '2026-11-13',
+        endDate: '2026-11-16',
+        currency: 'COP',
+        targetBudget: 2500000,
+        coverImage: 'https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=1600&auto=format&fit=crop',
+        notes: 'Paseo por Boyacá. Gastronomía, artesanos y descanso en Villa de Leyva.',
+        flights: [],
+        stays: [
+          { id: 's-boy-1', name: 'Hotel Colonial Villa de Leyva', city: 'Villa de Leyva', checkIn: '2026-11-13', checkOut: '2026-11-16', cost: 1200000, confirmCode: 'VL-3312', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop' }
+        ],
+        days: [
+          {
+            id: 'day-boy-1',
+            dayNumber: 1,
+            title: 'Llegada a Villa de Leyva & Plaza Mayor',
+            date: '2026-11-13',
+            coverImage: 'https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=800&auto=format&fit=crop',
+            activities: [
+              { id: 'act-b1-1', time: '02:00 PM', title: 'Check-in Hotel Colonial', city: 'Villa de Leyva', cost: 0, photo: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop', notes: 'Acomodación en habitaciones' },
+              { id: 'act-b1-2', time: '07:30 PM', title: 'Cena Típica en la Plaza Principal', city: 'Villa de Leyva', cost: 180000, photo: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=600&auto=format&fit=crop', notes: 'Probar vino local y picada boyacense' }
+            ]
+          }
+        ],
+        activities: [],
+        expenses: [
+          { id: 'e-boy-1', title: 'Gasolina y Peajes', category: 'transporte_inter', cost: 220000, date: '2026-11-13' }
+        ]
+      },
+      {
         id: 'trip-peru-magico-2027',
         title: 'Perú Mágico',
         subtitle: 'Cusco, Machu Picchu y Valle Sagrado',
-        startDate: '2027-04-04',
-        endDate: '2027-04-12',
+        startDate: '2027-05-02',
+        endDate: '2027-05-10',
         currency: 'COP',
         targetBudget: 10000000,
         coverImage: 'https://images.unsplash.com/photo-1526392060635-9d6019884377?q=80&w=1600&auto=format&fit=crop',
         notes: 'Viaje a Perú. Llevar abrigo para Cusco y boletos de ingreso a Machu Picchu reservados.',
         flights: [
-          { id: 'f-peru-1', company: 'LATAM Airlines', route: 'Bogotá -> Lima -> Cusco', date: '2027-04-04', cost: 2450000, bookingRef: 'LA-7721', notes: 'Incluye equipaje de mano y bodega' }
+          { id: 'f-peru-1', company: 'LATAM Airlines', route: 'Bogotá -> Lima -> Cusco', date: '2027-05-02', cost: 2450000, bookingRef: 'LA-7721', notes: 'Incluye equipaje de mano y bodega' }
         ],
         stays: [
-          { id: 's-peru-1', name: 'Hotel Boutique Cusco Plaza', city: 'Cusco', checkIn: '2027-04-04', checkOut: '2027-04-10', cost: 3200000, confirmCode: 'CUZ-8812', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop' }
+          { id: 's-peru-1', name: 'Hotel Boutique Cusco Plaza', city: 'Cusco', checkIn: '2027-05-02', checkOut: '2027-05-08', cost: 3200000, confirmCode: 'CUZ-8812', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop' }
         ],
         days: [
           {
             id: 'day-peru-1',
             dayNumber: 1,
             title: 'Llegada y Aclimatación en Cusco',
-            date: '2027-04-04',
+            date: '2027-05-02',
             coverImage: 'https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=800&auto=format&fit=crop',
             activities: [
               { id: 'act-p1-1', time: '09:30 AM', title: 'Llegada al Hotel Boutique & Mate de Coca', city: 'Cusco Center', cost: 0, photo: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop', notes: 'Reposo sugerido para la altura (3,400m).' },
               { id: 'act-p1-2', time: '02:00 PM', title: 'Caminata por la Plaza de Armas & San Blas', city: 'Cusco', cost: 80000, photo: 'https://images.unsplash.com/photo-1526392060635-9d6019884377?q=80&w=600&auto=format&fit=crop', notes: 'Visita a artesanos y la piedra de los 12 ángulos.' },
               { id: 'act-p1-3', time: '07:00 PM', title: 'Cena de Bienvenida en Restaurante Cicciolina', city: 'Cusco', cost: 250000, photo: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=600&auto=format&fit=crop', notes: 'Reserva confirmada a nombre de Luis & Marlin.' }
             ]
-          },
-          {
-            id: 'day-peru-2',
-            dayNumber: 2,
-            title: 'Valle Sagrado & Ollantaytambo',
-            date: '2027-04-05',
-            coverImage: 'https://images.unsplash.com/photo-1580619305218-8423a7ef79b4?q=80&w=800&auto=format&fit=crop',
-            activities: [
-              { id: 'act-p2-1', time: '07:30 AM', title: 'Visita a las Salineras de Maras & Moray', city: 'Valle Sagrado', cost: 180000, photo: 'https://images.unsplash.com/photo-1580619305218-8423a7ef79b4?q=80&w=600&auto=format&fit=crop', notes: 'Boleto Turístico parcial incluido.' },
-              { id: 'act-p2-2', time: '04:00 PM', title: 'Tren Expedition a Aguas Calientes', city: 'Ollantaytambo', cost: 650000, photo: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=600&auto=format&fit=crop', notes: 'Estar 30 minutos antes en la estación.' }
-            ]
           }
         ],
         activities: [],
         expenses: [
-          { id: 'e-peru-1', title: 'Boleto Turístico del Cusco', category: 'actividades', cost: 450000, date: '2027-04-05' }
+          { id: 'e-peru-1', title: 'Boleto Turístico del Cusco', category: 'actividades', cost: 450000, date: '2027-05-03' }
         ]
       },
       {
@@ -386,9 +486,16 @@
       });
 
       const [activeTripId, setActiveTripId] = useState(() => trips.length > 0 ? trips[0].id : null);
+
+      // Declaración garantizada de activeTrip al inicio del hook
+      const activeTrip = useMemo(() => {
+        return (trips || []).find(t => t.id === activeTripId) || trips[0] || null;
+      }, [trips, activeTripId]);
+
       const [activeTab, setActiveTab] = useState('cronograma');
       const [searchQuery, setSearchQuery] = useState('');
-      const [syncBadge, setSyncBadge] = useState('Guardado Local');
+      const [syncBadge, setSyncBadge] = useState('Guardado en Dispositivo');
+      const [isSyncing, setIsSyncing] = useState(false);
 
       // Modales de Interfaz
       const [showNewTripModal, setShowNewTripModal] = useState(false);
@@ -417,22 +524,75 @@
       const chartRef = useRef(null);
       const chartInstanceRef = useRef(null);
 
+      const showToast = (msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(''), 3000);
+      };
+
       const updateTripsList = (newList) => {
         setTrips(newList);
         const timestamp = saveToLocalStorage(newList);
         lastLocalUpdateRef.current = timestamp;
-        setSyncBadge('Guardado en Dispositivo');
+        setSyncBadge('Guardado Local');
 
+        setIsSyncing(true);
         window.CloudEngine.pushCloudPayload({ trips: newList, updatedAt: timestamp }, syncRoom)
-          .then(ok => { if (ok) setSyncBadge('Sincronizado Nube'); })
-          .catch(() => {});
+          .then(ok => { 
+            setIsSyncing(false);
+            if (ok) setSyncBadge('Sincronizado Nube'); 
+          })
+          .catch(() => { setIsSyncing(false); });
       };
 
-      // Loop de sincronización en segundo plano
+      const forceManualCloudSync = async () => {
+        setIsSyncing(true);
+        setSyncBadge('Sincronizando...');
+        const timestamp = Date.now();
+        lastLocalUpdateRef.current = timestamp;
+        saveToLocalStorage(trips);
+
+        // Primero subimos nuestros viajes locales
+        const pushedOk = await window.CloudEngine.pushCloudPayload({ trips, updatedAt: timestamp }, syncRoom);
+        
+        // Luego intentamos leer si hay viajes remotos para fusionar
+        const cloudPayload = await window.CloudEngine.fetchCloudPayload(syncRoom);
+        setIsSyncing(false);
+
+        if (cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
+          // Fusionar viajes por ID respetando los locales existentes
+          const cloudTrips = cloudPayload.trips;
+          const merged = [...trips];
+          cloudTrips.forEach(cTrip => {
+            const existsIdx = merged.findIndex(m => m.id === cTrip.id);
+            if (existsIdx === -1) {
+              merged.push(cTrip);
+            }
+          });
+          setTrips(merged);
+          saveToLocalStorage(merged);
+        }
+
+        if (pushedOk) {
+          setSyncBadge('Sincronizado Nube');
+          showToast(`✨ ¡Sincronizado con la Nube correctamente! (${syncRoom})`);
+        } else {
+          setSyncBadge('Guardado Local');
+          showToast(`⚡ Guardado localmente en este dispositivo.`);
+        }
+      };
+
+      // Loop de sincronización automática en segundo plano
       useEffect(() => {
         let isMounted = true;
+
+        // Intento de sincronización inmediata al cargar
+        window.CloudEngine.pushCloudPayload({ trips, updatedAt: Date.now() }, syncRoom)
+          .then(ok => {
+            if (isMounted && ok) setSyncBadge('Sincronizado Nube');
+          });
+
         const autoSyncLoop = async () => {
-          if (Date.now() - lastLocalUpdateRef.current < 12000) return;
+          if (Date.now() - lastLocalUpdateRef.current < 6000) return;
 
           const cloudPayload = await window.CloudEngine.fetchCloudPayload(syncRoom);
           if (isMounted && cloudPayload && Array.isArray(cloudPayload.trips) && cloudPayload.trips.length > 0) {
@@ -446,26 +606,28 @@
             }
 
             const cloudTimestamp = cloudPayload.updatedAt || 0;
-            if (cloudTimestamp > localTimestamp + 5000) {
-              setTrips(cloudPayload.trips);
-              saveToLocalStorage(cloudPayload.trips);
-              setSyncBadge('Actualizado de Nube');
+            if (cloudTimestamp > localTimestamp + 2000) {
+              setTrips(prevTrips => {
+                const mergedTrips = [...prevTrips];
+                cloudPayload.trips.forEach(cTrip => {
+                  const existsIdx = mergedTrips.findIndex(m => m.id === cTrip.id);
+                  if (existsIdx === -1) {
+                    mergedTrips.push(cTrip);
+                  } else {
+                    mergedTrips[existsIdx] = cTrip;
+                  }
+                });
+                saveToLocalStorage(mergedTrips);
+                return mergedTrips;
+              });
+              setSyncBadge('Sincronizado Nube');
             }
           }
         };
 
-        const interval = setInterval(autoSyncLoop, 9000);
+        const interval = setInterval(autoSyncLoop, 5000);
         return () => { isMounted = false; clearInterval(interval); };
       }, [syncRoom]);
-
-      const showToast = (msg) => {
-        setToastMessage(msg);
-        setTimeout(() => setToastMessage(''), 3500);
-      };
-
-      const activeTrip = useMemo(() => {
-        return trips.find(t => t.id === activeTripId) || trips[0] || null;
-      }, [trips, activeTripId]);
 
       const activeTripStats = useMemo(() => {
         if (!activeTrip) return { totalCost: 0, categoryTotals: {}, remaining: 0 };
@@ -691,14 +853,19 @@
               </div>
 
               <div className="flex items-center gap-1.5 sm:gap-2">
+                
+                {/* Botón / Estado de Sincronización */}
                 <button
-                  onClick={() => setShowRoomModal(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 border border-emerald-500/30 text-[10px] font-mono hover:border-emerald-500 transition-all shadow-sm"
-                  title="Gestionar Respaldo o Cambiar Sala"
+                  onClick={forceManualCloudSync}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 border text-[10px] font-mono hover:border-emerald-500 transition-all shadow-sm ${
+                    syncBadge === 'Sincronizado Nube' ? 'border-emerald-500/40 text-emerald-400' : 'border-amber-500/40 text-amber-300'
+                  }`}
+                  title="Haz clic para forzar la sincronización inmediata con el celular"
                 >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-emerald-400 font-bold hidden sm:inline">{syncBadge}</span>
+                  <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-400 animate-ping' : syncBadge === 'Sincronizado Nube' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}></span>
+                  <span className="font-bold hidden sm:inline">{isSyncing ? 'Sincronizando...' : syncBadge}</span>
                   <span className="text-slate-400 font-bold">({syncRoom})</span>
+                  <IconRefresh className={`w-3.5 h-3.5 text-cyan-400 ml-0.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 </button>
 
                 <button
@@ -728,7 +895,6 @@
             </div>
           )}
 
-          {}
           <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
             
             {/* Lista de Viajes */}
@@ -827,7 +993,6 @@
               </div>
             </div>
 
-            {/* Banner del Viaje Activo */}
             {activeTrip && (
               <div className="space-y-6 pt-2">
                 <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/80 shadow-2xl">
@@ -919,7 +1084,6 @@
                   </div>
                 </div>
 
-                {}
                 {activeTab === 'cronograma' && (
                   <div className="glass-panel p-4 sm:p-6 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1313,7 +1477,7 @@
                   </div>
                 )}
 
-                {}
+                {/* Tab Resumen */}
                 {activeTab === 'resumen' && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-1 glass-panel p-5 rounded-3xl space-y-4">
@@ -1402,6 +1566,7 @@
                   </div>
                 )}
 
+                {/* Tab Vuelos */}
                 {activeTab === 'vuelos' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1472,6 +1637,7 @@
                   </div>
                 )}
 
+                {/* Tab Hoteles */}
                 {activeTab === 'hoteles' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1547,6 +1713,7 @@
                   </div>
                 )}
 
+                {/* Tab Gastos */}
                 {activeTab === 'gastos' && (
                   <div className="glass-panel p-5 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1629,8 +1796,6 @@
             )}
 
           </main>
-
-          {}
 
           {/* Modal Editar Día */}
           {showEditDayModal && editingDay && activeTrip && (
