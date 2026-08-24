@@ -294,6 +294,7 @@
       { code: 'JPY', symbol: '¥', name: 'Yenes Japoneses (¥ JPY)' }
     ];
 
+    // Datos maestros iniciales limpios
     const INITIAL_TRIPS = [
       {
         id: 'trip-boyaca-2026',
@@ -320,11 +321,32 @@
               { id: 'act-b1-1', time: '02:00 PM', title: 'Check-in Hotel Colonial', city: 'Villa de Leyva', cost: 0, photo: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=600&auto=format&fit=crop', notes: 'Acomodación en habitaciones' },
               { id: 'act-b1-2', time: '07:30 PM', title: 'Cena Típica en la Plaza Principal', city: 'Villa de Leyva', cost: 180000, photo: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=600&auto=format&fit=crop', notes: 'Probar vino local y picada boyacense' }
             ]
+          },
+          {
+            id: 'day-boy-2',
+            dayNumber: 2,
+            title: 'RAQUIRA - TINJACÁ - SUTAMARCHAN - SANTA SOFIA - MUSEO - SÁCHICA',
+            date: '2026-11-14',
+            coverImage: 'https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=800&auto=format&fit=crop',
+            activities: [
+              { id: 'act-b2-1', time: '09:00 AM', title: 'Tour de Artesanos en Ráquira', city: 'Ráquira', cost: 150000, photo: 'https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=600&auto=format&fit=crop', notes: 'Visita a los talleres de cerámica' },
+              { id: 'act-b2-2', time: '01:00 PM', title: 'Almuerzo Longaniza en Sutamarchán', city: 'Sutamarchán', cost: 220000, photo: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=600&auto=format&fit=crop', notes: 'Especialidad gastronómica' }
+            ]
+          },
+          {
+            id: 'day-boy-3',
+            dayNumber: 3,
+            title: 'VILLA DE LEYVA Y ALREDEDORES',
+            date: '2026-11-15',
+            coverImage: 'https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=800&auto=format&fit=crop',
+            activities: [
+              { id: 'act-b3-1', time: '10:00 AM', title: 'Paseo Casa de Terracota & Pozos Azules', city: 'Villa de Leyva', cost: 120000, photo: 'https://images.unsplash.com/photo-1589802829985-817e51171b92?q=80&w=600&auto=format&fit=crop', notes: 'Recorrido cultural y natural' }
+            ]
           }
         ],
         activities: [],
         expenses: [
-          { id: 'e-boy-1', title: 'Gasolina, Peajes y Gastos Varios', category: 'transporte_inter', cost: 870000, date: '2026-11-13' }
+          { id: 'e-boy-1', title: 'Gasolina, Peajes y Gastos Varios', category: 'transporte_inter', cost: 580000, date: '2026-11-13' }
         ]
       },
       {
@@ -914,7 +936,6 @@
             </div>
           )}
 
-          {}
           <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
             
             <div className="space-y-3">
@@ -1104,7 +1125,6 @@
                   </div>
                 </div>
 
-                {}
                 {activeTab === 'cronograma' && (
                   <div className="glass-panel p-4 sm:p-6 rounded-3xl space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1818,7 +1838,6 @@
 
           </main>
 
-          {}
           {/* Modal Editar Día */}
           {showEditDayModal && editingDay && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -3159,17 +3178,3 @@
   </script>
 </body>
 </html>
-```
-
----
-
-### 📋 Cómo hacer para que tu celular muestre exactamente los datos del PC en 10 segundos:
-
-1. **En tu PC:**
-   - Abre el planeador y haz clic en el botón de la barra superior **`(LUIS-MARLIN-2026) 🔄`**.
-   - Verás el aviso en pantalla: `✨ ¡Sincronizado con la Nube correctamente!`. Esto subirá los 3 días con las 7 actividades de Boyacá directamente a la base de datos de Firebase.
-
-2. **En tu Celular:**
-   - Abre la aplicación en la URL de Vercel.
-   - Haz clic en ese mismo botón superior **`(LUIS-MARLIN-2026) 🔄`**.
-   - En menos de 2 segundos, el celular descargará exactamente los 3 días (*LLEGADA*, *RAQUIRA-TINJACÁ...*, *VILLA DE LEYVA Y ALREDEDORES*) con todos sus costos, fotos y actividades.
