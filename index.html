@@ -185,6 +185,18 @@
             ...d,
             coverImage: (d.coverImage && d.coverImage.length > 250000) ? '' : d.coverImage,
             mapUrl: d.mapUrl || '',
+            outfits: d.outfits ? {
+              marlin: {
+                desc: d.outfits.marlin?.desc || '',
+                footwear: d.outfits.marlin?.footwear || '',
+                photo: (d.outfits.marlin?.photo && d.outfits.marlin.photo.length > 250000) ? '' : (d.outfits.marlin?.photo || '')
+              },
+              luis: {
+                desc: d.outfits.luis?.desc || '',
+                footwear: d.outfits.luis?.footwear || '',
+                photo: (d.outfits.luis?.photo && d.outfits.luis.photo.length > 250000) ? '' : (d.outfits.luis?.photo || '')
+              }
+            } : null,
             activities: (d.activities || []).map(a => ({
               ...a,
               photo: (a.photo && a.photo.length > 250000) ? '' : a.photo
@@ -306,6 +318,9 @@
     );
     const IconChevronRight = ({ className = "w-4 h-4" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+    );
+    const IconShirt = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>
     );
 
     const PRESET_COVERS = [
@@ -492,6 +507,8 @@
       const [showCloudConfigModal, setShowCloudConfigModal] = useState(false);
       const [showQuickMapModal, setShowQuickMapModal] = useState(false);
       const [quickMapDay, setQuickMapDay] = useState(null);
+      const [showOutfitModal, setShowOutfitModal] = useState(false);
+      const [editingOutfitDay, setEditingOutfitDay] = useState(null);
 
       // Asistente IA
       const [aiQuery, setAiQuery] = useState('');
@@ -1122,6 +1139,7 @@
                   <div className="border-t border-slate-800/80 bg-slate-900/90 px-3 sm:px-6 py-2.5 flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto no-scrollbar">
                     {[
                       { id: 'cronograma', label: 'Cronograma & Actividades Por Días', icon: IconCalendar },
+                      { id: 'outfits', label: 'Outfits Luis & Marlin', icon: IconShirt },
                       { id: 'resumen', label: 'Resumen & Presupuesto', icon: IconPieChart },
                       { id: 'vuelos', label: 'Vuelos & Pasajes', icon: IconPlane },
                       { id: 'hoteles', label: 'Alojamiento & Hoteles', icon: IconHotel },
@@ -1493,6 +1511,85 @@
                               </div>
                             </div>
 
+                            {/* Tarjeta Visual de Outfits del Día */}
+                            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 bg-fuchsia-500/10 border border-fuchsia-500/30 text-fuchsia-400 rounded-xl">
+                                    <IconShirt className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <h5 className="font-bold text-xs sm:text-sm text-slate-100 flex items-center gap-1.5">
+                                      Outfits del Día
+                                      <span className="text-[10px] text-fuchsia-400 font-mono font-normal">Luis & Marlin</span>
+                                    </h5>
+                                    <p className="text-[10px] text-slate-400">Planifica las prendas para no repetir ropa en las fotos.</p>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => {
+                                    setEditingOutfitDay(selectedDay);
+                                    setShowOutfitModal(true);
+                                  }}
+                                  className="flex items-center gap-1 bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 border border-fuchsia-500/40 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                                >
+                                  <IconPencil className="w-3.5 h-3.5 text-fuchsia-400" />
+                                  <span>{selectedDay.outfits ? 'Editar Outfits' : '+ Asignar Outfits'}</span>
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                {/* Outfit Marlin */}
+                                <div className="bg-slate-950/70 border border-fuchsia-500/20 rounded-xl p-3 flex gap-3 items-center">
+                                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-900 border border-slate-800 flex-shrink-0 flex items-center justify-center">
+                                    {selectedDay.outfits?.marlin?.photo ? (
+                                      <img src={selectedDay.outfits.marlin.photo} alt="Marlin" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span className="text-[9px] text-slate-600 text-center font-bold uppercase">Sin foto</span>
+                                    )}
+                                  </div>
+                                  <div className="space-y-1 min-w-0 flex-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-fuchsia-400 bg-fuchsia-500/10 px-2 py-0.5 rounded-md">
+                                      👗 Marlin
+                                    </span>
+                                    <p className="text-xs text-slate-200 font-medium line-clamp-1">
+                                      {selectedDay.outfits?.marlin?.desc || 'Sin outfit asignado todavía'}
+                                    </p>
+                                    {selectedDay.outfits?.marlin?.footwear && (
+                                      <p className="text-[10px] text-slate-400 line-clamp-1">
+                                        👟 {selectedDay.outfits.marlin.footwear}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Outfit Luis */}
+                                <div className="bg-slate-950/70 border border-cyan-500/20 rounded-xl p-3 flex gap-3 items-center">
+                                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-900 border border-slate-800 flex-shrink-0 flex items-center justify-center">
+                                    {selectedDay.outfits?.luis?.photo ? (
+                                      <img src={selectedDay.outfits.luis.photo} alt="Luis" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span className="text-[9px] text-slate-600 text-center font-bold uppercase">Sin foto</span>
+                                    )}
+                                  </div>
+                                  <div className="space-y-1 min-w-0 flex-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md">
+                                      👔 Luis
+                                    </span>
+                                    <p className="text-xs text-slate-200 font-medium line-clamp-1">
+                                      {selectedDay.outfits?.luis?.desc || 'Sin outfit asignado todavía'}
+                                    </p>
+                                    {selectedDay.outfits?.luis?.footwear && (
+                                      <p className="text-[10px] text-slate-400 line-clamp-1">
+                                        👟 {selectedDay.outfits.luis.footwear}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
                             {/* Pasos / Actividades del Día */}
                             {dayActivities.length === 0 ? (
                               <div className="py-8 text-center bg-slate-900/40 rounded-2xl border border-slate-800 space-y-3">
@@ -1687,6 +1784,173 @@
                   </div>
                 )}
 
+                {/* Tab Outfits Completo (Luis & Marlin) */}
+                {activeTab === 'outfits' && (
+                  <div className="glass-panel p-5 rounded-3xl space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                      <div>
+                        <h3 className="font-extrabold text-base sm:text-lg text-slate-100 flex items-center gap-2">
+                          <IconShirt className="w-5 h-5 text-fuchsia-400" />
+                          Planificador de Outfits — Luis & Marlin
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          Revisa los looks día a día junto a las actividades programadas para no repetir ropa en las fotos.
+                        </p>
+                      </div>
+
+                      <span className="text-xs font-mono text-fuchsia-400 bg-fuchsia-500/10 border border-fuchsia-500/30 px-3 py-1.5 rounded-xl font-bold">
+                        {activeTripDays.filter(d => d.outfits?.marlin?.desc || d.outfits?.luis?.desc).length} de {activeTripDays.length} días con outfit
+                      </span>
+                    </div>
+
+                    {(!activeTripDays || activeTripDays.length === 0) ? (
+                      <div className="py-12 text-center text-slate-500 space-y-3">
+                        <IconShirt className="w-10 h-10 mx-auto text-slate-600" />
+                        <p className="text-xs">Crea días en el cronograma para poder planificar los outfits de cada día.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {activeTripDays.map((day, dIdx) => {
+                          const marlinOutfit = day.outfits?.marlin;
+                          const luisOutfit = day.outfits?.luis;
+                          const hasOutfits = Boolean(marlinOutfit?.desc || luisOutfit?.desc || marlinOutfit?.photo || luisOutfit?.photo);
+
+                          return (
+                            <div
+                              key={'outfit-day-' + day.id}
+                              className="bg-slate-900/80 border border-slate-800 hover:border-fuchsia-500/30 rounded-2xl p-4 sm:p-5 transition-all space-y-4 shadow-lg"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="bg-emerald-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                      Día {day.dayNumber || (dIdx + 1)}
+                                    </span>
+                                    {day.date && (
+                                      <span className="text-[11px] font-mono text-cyan-300 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
+                                        {day.date}
+                                      </span>
+                                    )}
+                                    <h4 className="font-bold text-sm sm:text-base text-white line-clamp-1">
+                                      {day.title}
+                                    </h4>
+                                  </div>
+
+                                  <p className="text-[11px] text-slate-400 line-clamp-1 italic">
+                                    📍 Actividades del día:{' '}
+                                    {day.activities && day.activities.length > 0
+                                      ? day.activities.map(a => a.title).join(' • ')
+                                      : 'Sin actividades registradas aún'}
+                                  </p>
+                                </div>
+
+                                <button
+                                  onClick={() => {
+                                    setEditingOutfitDay(day);
+                                    setShowOutfitModal(true);
+                                  }}
+                                  className="self-start sm:self-center flex items-center gap-1.5 bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 border border-fuchsia-500/40 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+                                >
+                                  <IconPencil className="w-3.5 h-3.5 text-fuchsia-400" />
+                                  <span>{hasOutfits ? 'Editar Outfits' : '+ Planificar Outfits'}</span>
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Marlin */}
+                                <div className="bg-slate-950/70 border border-fuchsia-500/20 rounded-2xl p-4 space-y-3">
+                                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-fuchsia-400 flex items-center gap-1.5">
+                                      👗 Outfit Marlin
+                                    </span>
+                                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${marlinOutfit?.desc ? 'bg-fuchsia-500/20 text-fuchsia-300' : 'bg-slate-800 text-slate-500'}`}>
+                                      {marlinOutfit?.desc ? 'Definido' : 'Pendiente'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex gap-3 items-start">
+                                    <div className="w-24 h-28 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 flex-shrink-0 flex items-center justify-center">
+                                      {marlinOutfit?.photo ? (
+                                        <img src={marlinOutfit.photo} alt="Outfit Marlin" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="text-center p-2 text-slate-600 space-y-1">
+                                          <IconShirt className="w-6 h-6 mx-auto opacity-50" />
+                                          <span className="text-[9px] block">Sin foto</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1 space-y-1.5 text-xs">
+                                      <div>
+                                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Prendas / Look:</span>
+                                        <p className="text-slate-200 font-medium leading-relaxed">
+                                          {marlinOutfit?.desc || 'No se han descrito las prendas de Marlin.'}
+                                        </p>
+                                      </div>
+
+                                      {marlinOutfit?.footwear && (
+                                        <div>
+                                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Calzado / Accesorios:</span>
+                                          <p className="text-fuchsia-300 font-medium">
+                                            👟 {marlinOutfit.footwear}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Luis */}
+                                <div className="bg-slate-950/70 border border-cyan-500/20 rounded-2xl p-4 space-y-3">
+                                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                                      👔 Outfit Luis
+                                    </span>
+                                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${luisOutfit?.desc ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-500'}`}>
+                                      {luisOutfit?.desc ? 'Definido' : 'Pendiente'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex gap-3 items-start">
+                                    <div className="w-24 h-28 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 flex-shrink-0 flex items-center justify-center">
+                                      {luisOutfit?.photo ? (
+                                        <img src={luisOutfit.photo} alt="Outfit Luis" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="text-center p-2 text-slate-600 space-y-1">
+                                          <IconShirt className="w-6 h-6 mx-auto opacity-50" />
+                                          <span className="text-[9px] block">Sin foto</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1 space-y-1.5 text-xs">
+                                      <div>
+                                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Prendas / Look:</span>
+                                        <p className="text-slate-200 font-medium leading-relaxed">
+                                          {luisOutfit?.desc || 'No se han descrito las prendas de Luis.'}
+                                        </p>
+                                      </div>
+
+                                      {luisOutfit?.footwear && (
+                                        <div>
+                                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Calzado / Accesorios:</span>
+                                          <p className="text-cyan-300 font-medium">
+                                            👟 {luisOutfit.footwear}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Tab Resumen */}
                 {activeTab === 'resumen' && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1830,8 +2094,8 @@
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
-                              <span className="text-[11px] text-slate-400 italic line-clamp-1">{fl.notes || 'Sin observaciones'}</span>
+                            <div className="flex items-center justify-between pt-2">
+                              <span className="text-[11px] text-slate-400 italic">{fl.notes}</span>
                               <button
                                 onClick={() => {
                                   const updatedTrip = { ...activeTrip, flights: activeTrip.flights.filter(f => f.id !== fl.id) };
@@ -1839,7 +2103,7 @@
                                   updateTripsList(updatedList);
                                   showToast("Vuelo eliminado.");
                                 }}
-                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
+                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
                               >
                                 <IconTrash className="w-3.5 h-3.5" />
                               </button>
@@ -1880,38 +2144,32 @@
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {activeTrip.stays.map(st => (
-                          <div key={st.id} className="glass-card rounded-2xl overflow-hidden flex flex-col justify-between border border-slate-800">
+                          <div key={st.id} className="glass-card rounded-2xl overflow-hidden flex flex-col justify-between">
                             {st.image && (
-                              <div className="h-36 w-full relative overflow-hidden bg-slate-950">
-                                <img src={st.image} alt={st.name} className="w-full h-full object-cover opacity-80 hover:scale-105 transition-transform duration-500" onError={(e) => { e.target.style.display = 'none'; }} />
+                              <div className="h-32 w-full relative">
+                                <img src={st.image} alt={st.name} className="w-full h-full object-cover opacity-80" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
                               </div>
                             )}
 
                             <div className="p-4 space-y-2">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold uppercase text-purple-400 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md">{st.city}</span>
-                                <span className="font-mono font-bold text-emerald-400 text-sm bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                                <span className="text-[10px] font-bold uppercase text-purple-400">{st.city}</span>
+                                <span className="font-mono font-bold text-emerald-400 text-xs">
                                   {formatMoney(st.cost, activeTrip.currency)}
                                 </span>
                               </div>
 
                               <h4 className="font-bold text-sm text-slate-100">{st.name}</h4>
 
-                              <div className="text-xs text-slate-400 flex justify-between pt-1 border-t border-slate-800/60 font-mono">
-                                <span>Check-In: <strong className="text-slate-200">{st.checkIn || 'TBD'}</strong></span>
-                                <span>Check-Out: <strong className="text-slate-200">{st.checkOut || 'TBD'}</strong></span>
+                              <div className="text-xs text-slate-400 flex justify-between pt-1">
+                                <span>Check-In: {st.checkIn || 'TBD'}</span>
+                                <span>Check-Out: {st.checkOut || 'TBD'}</span>
                               </div>
-
-                              {st.notes && (
-                                <p className="text-[11px] text-slate-400 italic bg-slate-950/40 p-2 rounded-xl border border-slate-800/60">
-                                  "{st.notes}"
-                                </p>
-                              )}
                             </div>
 
                             <div className="p-4 pt-0 flex items-center justify-between">
-                              <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                              <span className="text-[10px] font-mono text-slate-400">
                                 Confirmación: {st.confirmCode || 'N/A'}
                               </span>
                               <button
@@ -1921,10 +2179,9 @@
                                   updateTripsList(updatedList);
                                   showToast("Alojamiento eliminado.");
                                 }}
-                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
+                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
                               >
                                 <IconTrash className="w-3.5 h-3.5" />
-                                <span>Eliminar</span>
                               </button>
                             </div>
                           </div>
@@ -2017,6 +2274,196 @@
             )}
 
           </main>
+
+          {/* Modal Editar Outfits del Día (Luis & Marlin) */}
+          {showOutfitModal && editingOutfitDay && activeTrip && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl max-h-[92vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30 text-fuchsia-400">
+                      <IconShirt className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-100 text-base">
+                        Outfits — Día {editingOutfitDay.dayNumber}: {editingOutfitDay.title}
+                      </h3>
+                      <p className="text-[11px] text-slate-400">Planifica y guarda los looks para evitar repetir ropa.</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { setShowOutfitModal(false); setEditingOutfitDay(null); }} className="text-slate-500 hover:text-slate-300">
+                    <IconX className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+
+                    const newOutfits = {
+                      marlin: {
+                        desc: formData.get('marlin_desc') || '',
+                        footwear: formData.get('marlin_footwear') || '',
+                        photo: formData.get('marlin_photo') || ''
+                      },
+                      luis: {
+                        desc: formData.get('luis_desc') || '',
+                        footwear: formData.get('luis_footwear') || '',
+                        photo: formData.get('luis_photo') || ''
+                      }
+                    };
+
+                    const updatedDays = activeTrip.days.map(d => {
+                      if (d.id === editingOutfitDay.id) {
+                        return { ...d, outfits: newOutfits };
+                      }
+                      return d;
+                    });
+
+                    const updatedTrip = { ...activeTrip, days: updatedDays };
+                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                    updateTripsList(updatedList);
+
+                    setShowOutfitModal(false);
+                    setEditingOutfitDay(null);
+                    showToast("✨ ¡Outfits guardados correctamente!");
+                  }}
+                  className="space-y-6 text-xs"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* Sección Marlin */}
+                    <div className="bg-slate-950/60 p-4 rounded-2xl border border-fuchsia-500/30 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="font-bold text-sm text-fuchsia-400">👗 Outfit de Marlin</span>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 block mb-1 font-medium">Prendas / Ropa *</label>
+                        <textarea
+                          name="marlin_desc"
+                          rows="2"
+                          defaultValue={editingOutfitDay.outfits?.marlin?.desc || ''}
+                          placeholder="Ej: Vestido blanco tejido, abrigo largo beige, bufanda rosa..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-fuchsia-500 focus:outline-none"
+                        ></textarea>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 block mb-1 font-medium">Calzado / Accesorios</label>
+                        <input
+                          name="marlin_footwear"
+                          defaultValue={editingOutfitDay.outfits?.marlin?.footwear || ''}
+                          placeholder="Ej: Botas negras cómodas, cartera café"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-slate-200 focus:border-fuchsia-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 block mb-1 font-medium">Foto del Look / Prendas</label>
+                        <label className="cursor-pointer bg-slate-900 border border-slate-800 border-dashed rounded-xl p-2 text-center text-slate-400 hover:text-fuchsia-400 hover:border-fuchsia-500/50 transition-all flex items-center justify-center gap-1 text-[11px] mb-1">
+                          <IconUpload className="w-3.5 h-3.5" />
+                          <span>Subir foto desde celular</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                const compressedUrl = await window.compressImage(file);
+                                const input = document.getElementById('marlin-outfit-photo-input');
+                                if (input && compressedUrl) input.value = compressedUrl;
+                              }
+                            }}
+                          />
+                        </label>
+                        <input
+                          id="marlin-outfit-photo-input"
+                          name="marlin_photo"
+                          defaultValue={editingOutfitDay.outfits?.marlin?.photo || ''}
+                          placeholder="O pega URL de foto https://..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-slate-200 text-[11px]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sección Luis */}
+                    <div className="bg-slate-950/60 p-4 rounded-2xl border border-cyan-500/30 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="font-bold text-sm text-cyan-400">👔 Outfit de Luis</span>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 block mb-1 font-medium">Prendas / Ropa *</label>
+                        <textarea
+                          name="luis_desc"
+                          rows="2"
+                          defaultValue={editingOutfitDay.outfits?.luis?.desc || ''}
+                          placeholder="Ej: Camisa azul oxford, chaqueta impermeable negra, jeans oscuros..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none"
+                        ></textarea>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 block mb-1 font-medium">Calzado / Accesorios</label>
+                        <input
+                          name="luis_footwear"
+                          defaultValue={editingOutfitDay.outfits?.luis?.footwear || ''}
+                          placeholder="Ej: Tenis blancos de caminar, reloj negro"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-slate-200 focus:border-cyan-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-slate-400 block mb-1 font-medium">Foto del Look / Prendas</label>
+                        <label className="cursor-pointer bg-slate-900 border border-slate-800 border-dashed rounded-xl p-2 text-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50 transition-all flex items-center justify-center gap-1 text-[11px] mb-1">
+                          <IconUpload className="w-3.5 h-3.5" />
+                          <span>Subir foto desde celular</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                const compressedUrl = await window.compressImage(file);
+                                const input = document.getElementById('luis-outfit-photo-input');
+                                if (input && compressedUrl) input.value = compressedUrl;
+                              }
+                            }}
+                          />
+                        </label>
+                        <input
+                          id="luis-outfit-photo-input"
+                          name="luis_photo"
+                          defaultValue={editingOutfitDay.outfits?.luis?.photo || ''}
+                          placeholder="O pega URL de foto https://..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-slate-200 text-[11px]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => { setShowOutfitModal(false); setEditingOutfitDay(null); }}
+                      className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-cyan-500 hover:from-fuchsia-400 hover:to-cyan-400 text-slate-950 font-bold shadow-lg shadow-fuchsia-500/20"
+                    >
+                      Guardar Outfits
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           {/* Modal Pegar Ruta Personalizada de Maps */}
           {showQuickMapModal && quickMapDay && activeTrip && (
