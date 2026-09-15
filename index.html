@@ -1986,29 +1986,29 @@
                                 <span>Check-Out: {st.checkOut || 'TBD'}</span>
                               </div>
                             </div>
-
-                            <div className="p-4 pt-0 flex items-center justify-between">
-                              <span className="text-[10px] font-mono text-slate-400">
-                                Confirmación: {st.confirmCode || 'N/A'}
-                              </span>
-                              <button
-                                onClick={() => {
-                                  const updatedTrip = { ...activeTrip, stays: activeTrip.stays.filter(s => s.id !== st.id) };
-                                  const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                  updateTripsList(updatedList);
-                                  showToast("Alojamiento eliminado.");
-                                }}
-                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
-                              >
-                                <IconTrash className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="p-4 pt-0 flex items-center justify-between">
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                  Confirmación: {st.confirmCode || 'N/A'}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    const updatedTrip = { ...activeTrip, stays: activeTrip.stays.filter(s => s.id !== st.id) };
+                                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                    updateTripsList(updatedList);
+                                    showToast("Alojamiento eliminado.");
+                                  }}
+                                  className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
+                                >
+                                  <IconTrash className="w-3.5 h-3.5" />
+                                  <span>Eliminar</span>
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                 {/* Tab Gastos */}
                 {activeTab === 'gastos' && (
