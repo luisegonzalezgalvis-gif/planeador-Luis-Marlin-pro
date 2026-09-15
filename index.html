@@ -334,11 +334,30 @@
       { code: 'JPY', symbol: '¥', name: 'Yenes Japoneses (¥ JPY)' }
     ];
 
+    // Helper para limpiar y normalizar enlaces de Google Maps
+    function cleanMapUrl(rawUrl) {
+      if (!rawUrl) return '';
+      let url = String(rawUrl).trim();
+      // Si el usuario pegó el código HTML de iframe (<iframe src="..."/>)
+      const iframeMatch = url.match(/src=["']([^"']+)["']/i);
+      if (iframeMatch && iframeMatch[1]) {
+        url = iframeMatch[1];
+      }
+      url = url.replace(/["'<>]/g, '').trim();
+      if (!url) return '';
+      // Si pegó el enlace sin https:// (ej. maps.app.goo.gl/... o www.google.com/...)
+      if (!/^https?:\/\//i.test(url)) {
+        url = 'https://' + url;
+      }
+      return url;
+    }
+
     // Helper para generar URLs de navegación en Google Maps
     function generateGoogleMapsRoute(activities, customMapUrl = '', tripCityContext = '') {
       // 1. Si el usuario pegó su propia ruta armada en Google Maps, tiene prioridad 100%
-      if (customMapUrl && customMapUrl.trim().startsWith('http')) {
-        return customMapUrl.trim();
+      const cleanedCustom = cleanMapUrl(customMapUrl);
+      if (cleanedCustom) {
+        return cleanedCustom;
       }
       if (!activities || activities.length === 0) return null;
 
@@ -1393,26 +1412,34 @@
 
                               <div className="absolute top-3 right-3 flex items-center gap-1.5">
                                 {/* Botón Google Maps de la Ruta Completa */}
-                                {mapsUrl ? (
-                                  <a
-                                    href={mapsUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-xl transition-all text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-blue-500/30"
-                                    title="Abrir Ruta Completa del Día en Google Maps"
-                                  >
-                                    <IconCompass className="w-4 h-4 text-white" />
-                                    <span>{selectedDay.mapUrl ? 'Abrir Mi Ruta Maps' : 'Ver Ruta en Maps'}</span>
-                                  </a>
-                                ) : (
-                                  <button
-                                    onClick={() => showToast("Agrega actividades o pega tu ruta personalizada.")}
-                                    className="bg-slate-800/90 text-slate-400 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 border border-slate-700"
-                                  >
-                                    <IconCompass className="w-4 h-4 text-slate-500" />
-                                    <span>Sin Ruta Maps</span>
-                                  </button>
-                                )}
+                                {(() => {
+                                  const customUrl = cleanMapUrl(selectedDay.mapUrl);
+                                  const finalUrl = customUrl || mapsUrl;
+                                  return finalUrl ? (
+                                    <a
+                                      href={finalUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        window.open(finalUrl, '_blank', 'noopener,noreferrer');
+                                      }}
+                                      className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-xl transition-all text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-blue-500/30"
+                                      title="Abrir Ruta Completa del Día en Google Maps"
+                                    >
+                                      <IconCompass className="w-4 h-4 text-white" />
+                                      <span>{customUrl ? 'Abrir Mi Ruta Maps' : 'Ver Ruta en Maps'}</span>
+                                    </a>
+                                  ) : (
+                                    <button
+                                      onClick={() => showToast("Agrega actividades o pega tu ruta personalizada.")}
+                                      className="bg-slate-800/90 text-slate-400 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 border border-slate-700"
+                                    >
+                                      <IconCompass className="w-4 h-4 text-slate-500" />
+                                      <span>Sin Ruta Maps</span>
+                                    </button>
+                                  );
+                                })()}
 
                                 <button
                                   onClick={() => {
@@ -2014,6 +2041,26 @@
                     />
                   </div>
 
+                  {/* Botón para Probar el enlace ingresado en vivo */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('quick-map-url-input');
+                        const url = cleanMapUrl(input ? input.value : '');
+                        if (url) {
+                          window.open(url, '_blank', 'noopener,noreferrer');
+                        } else {
+                          showToast("Pega un enlace primero para poder probarlo.");
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <IconCompass className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Probar enlace en nueva pestaña</span>
+                    </button>
+                  </div>
+
                   <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1.5 text-[11px] text-slate-400">
                     <span className="font-bold text-slate-200 block">💡 ¿Cómo armar y copiar tu ruta sin errores?</span>
                     <p>1. Entra a <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline">maps.google.com</a> en tu PC o celular.</p>
@@ -2053,7 +2100,8 @@
                       type="button"
                       onClick={() => {
                         const input = document.getElementById('quick-map-url-input');
-                        const newUrl = input ? input.value.trim() : '';
+                        const raw = input ? input.value : '';
+                        const newUrl = cleanMapUrl(raw);
                         const updatedDays = activeTrip.days.map(d => d.id === quickMapDay.id ? { ...d, mapUrl: newUrl } : d);
                         const updatedTrip = { ...activeTrip, days: updatedDays };
                         const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
