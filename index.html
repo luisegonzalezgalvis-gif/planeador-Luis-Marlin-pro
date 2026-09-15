@@ -1818,16 +1818,20 @@
 
                             <div className="space-y-1 text-xs">
                               <p className="font-semibold text-slate-200">{fl.route}</p>
-                              <div className="flex items-center justify-between text-slate-400 pt-1">
-                                <span>Fecha: {fl.date || 'TBD'}</span>
-                                <span className="font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                              <div className="flex items-center justify-between text-slate-400 pt-1 flex-wrap gap-1">
+                                <span className="flex items-center gap-1 font-mono text-[11px]">
+                                  <IconCalendar className="w-3.5 h-3.5 text-cyan-400" />
+                                  {fl.date || 'Fecha TBD'}
+                                  {fl.time && <span className="text-cyan-300">({fl.time})</span>}
+                                </span>
+                                <span className="font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-[11px]">
                                   Reserva: {fl.bookingRef || 'N/A'}
                                 </span>
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between pt-2">
-                              <span className="text-[11px] text-slate-400 italic">{fl.notes}</span>
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                              <span className="text-[11px] text-slate-400 italic line-clamp-1">{fl.notes || 'Sin observaciones'}</span>
                               <button
                                 onClick={() => {
                                   const updatedTrip = { ...activeTrip, flights: activeTrip.flights.filter(f => f.id !== fl.id) };
@@ -1835,9 +1839,92 @@
                                   updateTripsList(updatedList);
                                   showToast("Vuelo eliminado.");
                                 }}
-                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
+                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
                               >
                                 <IconTrash className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab Hoteles */}
+                {activeTab === 'hoteles' && (
+                  <div className="glass-panel p-5 rounded-3xl space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                      <div>
+                        <h3 className="font-bold text-base text-slate-100 flex items-center gap-2">
+                          <IconHotel className="w-5 h-5 text-purple-400" />
+                          Alojamientos & Hoteles
+                        </h3>
+                        <p className="text-xs text-slate-400">Hoteles y reservas organizadas por destino.</p>
+                      </div>
+
+                      <button
+                        onClick={() => setShowStayModal(true)}
+                        className="flex items-center gap-2 bg-purple-500 hover:bg-purple-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
+                      >
+                        <IconPlus className="w-4 h-4" />
+                        Registrar Hotel
+                      </button>
+                    </div>
+
+                    {(!activeTrip.stays || activeTrip.stays.length === 0) ? (
+                      <div className="py-12 text-center text-slate-500 space-y-3">
+                        <IconHotel className="w-10 h-10 mx-auto text-slate-600" />
+                        <p className="text-xs">No hay alojamientos registrados aún.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {activeTrip.stays.map(st => (
+                          <div key={st.id} className="glass-card rounded-2xl overflow-hidden flex flex-col justify-between border border-slate-800">
+                            {st.image && (
+                              <div className="h-36 w-full relative overflow-hidden bg-slate-950">
+                                <img src={st.image} alt={st.name} className="w-full h-full object-cover opacity-80 hover:scale-105 transition-transform duration-500" onError={(e) => { e.target.style.display = 'none'; }} />
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
+                              </div>
+                            )}
+
+                            <div className="p-4 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase text-purple-400 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md">{st.city}</span>
+                                <span className="font-mono font-bold text-emerald-400 text-sm bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                                  {formatMoney(st.cost, activeTrip.currency)}
+                                </span>
+                              </div>
+
+                              <h4 className="font-bold text-sm text-slate-100">{st.name}</h4>
+
+                              <div className="text-xs text-slate-400 flex justify-between pt-1 border-t border-slate-800/60 font-mono">
+                                <span>Check-In: <strong className="text-slate-200">{st.checkIn || 'TBD'}</strong></span>
+                                <span>Check-Out: <strong className="text-slate-200">{st.checkOut || 'TBD'}</strong></span>
+                              </div>
+
+                              {st.notes && (
+                                <p className="text-[11px] text-slate-400 italic bg-slate-950/40 p-2 rounded-xl border border-slate-800/60">
+                                  "{st.notes}"
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="p-4 pt-0 flex items-center justify-between">
+                              <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                Confirmación: {st.confirmCode || 'N/A'}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  const updatedTrip = { ...activeTrip, stays: activeTrip.stays.filter(s => s.id !== st.id) };
+                                  const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                  updateTripsList(updatedList);
+                                  showToast("Alojamiento eliminado.");
+                                }}
+                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
+                              >
+                                <IconTrash className="w-3.5 h-3.5" />
+                                <span>Eliminar</span>
                               </button>
                             </div>
                           </div>
@@ -3197,9 +3284,12 @@
           {/* Modal Vuelos */}
           {showFlightModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="font-bold text-slate-100 text-base">Registrar Vuelo</h3>
+                  <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+                    <IconPlane className="w-5 h-5 text-cyan-400" />
+                    Registrar Vuelo
+                  </h3>
                   <button onClick={() => setShowFlightModal(false)} className="text-slate-500 hover:text-slate-300">
                     <IconX className="w-5 h-5" />
                   </button>
@@ -3213,10 +3303,11 @@
                       id: 'fl-' + Date.now(),
                       company: formData.get('company'),
                       route: formData.get('route'),
-                      date: formData.get('date'),
+                      date: formData.get('date') || '',
+                      time: formData.get('time') || '',
                       cost: Number(formData.get('cost')) || 0,
-                      bookingRef: formData.get('bookingRef'),
-                      notes: formData.get('notes')
+                      bookingRef: formData.get('bookingRef') || '',
+                      notes: formData.get('notes') || ''
                     };
 
                     const updatedTrip = { ...activeTrip, flights: [newFlight, ...(activeTrip.flights || [])] };
@@ -3224,31 +3315,50 @@
                     updateTripsList(updatedList);
 
                     setShowFlightModal(false);
-                    showToast("Vuelo registrado.");
+                    showToast("Vuelo registrado correctamente.");
                   }}
                   className="space-y-4 text-xs"
                 >
                   <div>
-                    <label className="text-slate-400 block mb-1 font-medium">Aerolínea *</label>
-                    <input name="company" required placeholder="Ej: Avianca / LATAM" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                    <label className="text-slate-400 block mb-1 font-medium">Aerolínea / Compañía *</label>
+                    <input name="company" required placeholder="Ej: Avianca / LATAM / Delta" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
                   </div>
+
                   <div>
-                    <label className="text-slate-400 block mb-1 font-medium">Ruta *</label>
-                    <input name="route" required placeholder="Ej: Bogotá -> New York (JFK)" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                    <label className="text-slate-400 block mb-1 font-medium">Ruta / Trayecto *</label>
+                    <input name="route" required placeholder="Ej: Bogotá (BOG) -> New York (JFK)" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
                   </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-slate-400 block mb-1 font-medium">Costo ({activeTrip.currency})</label>
-                      <input type="number" name="cost" placeholder="2500000" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400" />
+                      <label className="text-slate-400 block mb-1 font-medium">Fecha del Vuelo</label>
+                      <input type="date" name="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
                     </div>
                     <div>
-                      <label className="text-slate-400 block mb-1 font-medium">Código Reserva</label>
-                      <input name="bookingRef" placeholder="AV-9812" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                      <label className="text-slate-400 block mb-1 font-medium">Hora de Salida / Abordaje</label>
+                      <input type="time" name="time" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button type="button" onClick={() => setShowFlightModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300">Cancelar</button>
-                    <button type="submit" className="px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold">Guardar Vuelo</button>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-400 block mb-1 font-medium">Costo Total ({activeTrip.currency})</label>
+                      <input type="number" name="cost" placeholder="2500000" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1 font-medium">Código de Reserva</label>
+                      <input name="bookingRef" placeholder="AV-9812 / 6 letras" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none uppercase font-mono" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-400 block mb-1 font-medium">Notas / Terminal / Equipaje</label>
+                    <textarea name="notes" rows="2" placeholder="Ej: Terminal 4, incluye maleta de 23kg..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none"></textarea>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button type="button" onClick={() => setShowFlightModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold">Cancelar</button>
+                    <button type="submit" className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all">Guardar Vuelo</button>
                   </div>
                 </form>
               </div>
@@ -3258,9 +3368,12 @@
           {/* Modal Hoteles */}
           {showStayModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="font-bold text-slate-100 text-base">Registrar Alojamiento / Hotel</h3>
+                  <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+                    <IconHotel className="w-5 h-5 text-purple-400" />
+                    Registrar Alojamiento / Hotel
+                  </h3>
                   <button onClick={() => setShowStayModal(false)} className="text-slate-500 hover:text-slate-300">
                     <IconX className="w-5 h-5" />
                   </button>
@@ -3274,11 +3387,12 @@
                       id: 'stay-' + Date.now(),
                       name: formData.get('name'),
                       city: formData.get('city'),
-                      checkIn: formData.get('checkIn'),
-                      checkOut: formData.get('checkOut'),
+                      checkIn: formData.get('checkIn') || '',
+                      checkOut: formData.get('checkOut') || '',
                       cost: Number(formData.get('cost')) || 0,
-                      confirmCode: formData.get('confirmCode'),
-                      image: formData.get('image')
+                      confirmCode: formData.get('confirmCode') || '',
+                      image: formData.get('image') || '',
+                      notes: formData.get('notes') || ''
                     };
 
                     const updatedTrip = { ...activeTrip, stays: [newStay, ...(activeTrip.stays || [])] };
@@ -3286,31 +3400,74 @@
                     updateTripsList(updatedList);
 
                     setShowStayModal(false);
-                    showToast("Alojamiento registrado.");
+                    showToast("Alojamiento registrado correctamente.");
                   }}
                   className="space-y-4 text-xs"
                 >
                   <div>
-                    <label className="text-slate-400 block mb-1 font-medium">Nombre Hotel *</label>
-                    <input name="name" required placeholder="Ej: Manhattan Downtown Hotel" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                    <label className="text-slate-400 block mb-1 font-medium">Nombre del Hotel / Alojamiento *</label>
+                    <input name="name" required placeholder="Ej: Manhattan Downtown Hotel" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
                   </div>
+
                   <div>
-                    <label className="text-slate-400 block mb-1 font-medium">Ciudad *</label>
-                    <input name="city" required placeholder="Ej: Nueva York" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                    <label className="text-slate-400 block mb-1 font-medium">Ciudad / Zona *</label>
+                    <input name="city" required placeholder="Ej: Nueva York (Midtown)" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
                   </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Check-In</label>
-                      <input type="date" name="checkIn" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                      <input type="date" name="checkIn" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Check-Out</label>
-                      <input type="date" name="checkOut" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200" />
+                      <input type="date" name="checkOut" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button type="button" onClick={() => setShowStayModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300">Cancelar</button>
-                    <button type="submit" className="px-4 py-2 rounded-xl bg-purple-500 text-slate-950 font-bold">Guardar Hotel</button>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-purple-400 block mb-1 font-bold">Valor Pagado ({activeTrip.currency}) *</label>
+                      <input type="number" name="cost" required placeholder="3200000" className="w-full bg-slate-950 border border-purple-500/50 rounded-xl p-2.5 font-mono text-emerald-400 font-bold focus:border-purple-400 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 block mb-1 font-medium">Código Confirmación</label>
+                      <input name="confirmCode" placeholder="Ej: BKG-88123" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none font-mono uppercase" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-400 block mb-1 font-medium">Foto del Hotel / Fachada</label>
+                    <div className="space-y-2">
+                      <label className="cursor-pointer bg-slate-950 border border-slate-800 border-dashed rounded-xl p-2.5 text-center text-slate-400 hover:text-purple-400 hover:border-purple-500/50 transition-all flex items-center justify-center gap-2">
+                        <IconUpload className="w-4 h-4" />
+                        <span>Subir foto desde celular / PC</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              const compressedUrl = await window.compressImage(file);
+                              const input = document.getElementById('stay-image-input');
+                              if (input && compressedUrl) input.value = compressedUrl;
+                            }
+                          }}
+                        />
+                      </label>
+                      <input id="stay-image-input" name="image" placeholder="O pega URL de imagen https://..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-[11px] focus:border-purple-500 focus:outline-none" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-400 block mb-1 font-medium">Notas / Tipo de Habitación / Desayuno</label>
+                    <textarea name="notes" rows="2" placeholder="Ej: Habitación King con vista, incluye desayuno tipo buffet..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none"></textarea>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button type="button" onClick={() => setShowStayModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold">Cancelar</button>
+                    <button type="submit" className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold transition-all">Guardar Hotel</button>
                   </div>
                 </form>
               </div>
