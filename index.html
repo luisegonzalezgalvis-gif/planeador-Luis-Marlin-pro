@@ -2267,6 +2267,12 @@
                                 <span>Check-In: {st.checkIn || 'TBD'}</span>
                                 <span>Check-Out: {st.checkOut || 'TBD'}</span>
                               </div>
+                              
+                              {st.notes && (
+                                <p className="text-[11px] text-slate-400 italic bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/60 mt-2 leading-relaxed">
+                                  {st.notes}
+                                </p>
+                              )}
                             </div>
 
                             <div className="p-4 pt-0 flex items-center justify-between">
