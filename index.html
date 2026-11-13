@@ -349,13 +349,6 @@
       { code: 'JPY', symbol: '¥', name: 'Yenes Japoneses (¥ JPY)' }
     ];
 
-    const EXCHANGE_RATES = {
-      COP: 1,
-      USD: 4050,
-      EUR: 4400,
-      JPY: 27
-    };
-
     // Helper para limpiar y normalizar enlaces de Google Maps
     function cleanMapUrl(rawUrl) {
       if (!rawUrl) return '';
@@ -470,6 +463,31 @@
       const [firebaseUrl, setFirebaseUrl] = useState(() => window.CloudEngine.getFirebaseUrl());
       const lastLocalUpdateRef = useRef(Date.now());
       
+      const [exchangeRates, setExchangeRates] = useState({
+        COP: 1,
+        USD: 3281.74,
+        EUR: 3450.50,
+        JPY: 21.20
+      });
+
+      useEffect(() => {
+        // Cargar tasas de cambio diarias usando una API pública y gratuita
+        fetch('https://open.er-api.com/v6/latest/USD')
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.rates && data.rates.COP) {
+              const copBase = data.rates.COP;
+              setExchangeRates({
+                COP: 1,
+                USD: copBase,
+                EUR: copBase / (data.rates.EUR || 1),
+                JPY: copBase / (data.rates.JPY || 1)
+              });
+            }
+          })
+          .catch(e => console.log('Sin conexión a API de divisas, usando tasas de cambio guardadas.', e));
+      }, []);
+
       const [trips, setTrips] = useState(() => {
         try {
           const raw = localStorage.getItem(MASTER_STORAGE_KEY);
@@ -3100,7 +3118,7 @@
                     const rawCost = Number(formData.get('cost')) || 0;
                     const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
                     const tripCurrency = activeTrip.currency || 'COP';
-                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+                    const finalCost = (rawCost * (exchangeRates[inputCurrency] || 1)) / (exchangeRates[tripCurrency] || 1);
 
                     const newAct = {
                       id: 'act-' + Date.now(),
@@ -3270,7 +3288,7 @@
                     const rawCost = Number(formData.get('cost')) || 0;
                     const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
                     const tripCurrency = activeTrip.currency || 'COP';
-                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+                    const finalCost = (rawCost * (exchangeRates[inputCurrency] || 1)) / (exchangeRates[tripCurrency] || 1);
 
                     const updatedAct = {
                       ...editingActivity,
@@ -3759,7 +3777,7 @@
                     const rawCost = Number(formData.get('cost')) || 0;
                     const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
                     const tripCurrency = activeTrip.currency || 'COP';
-                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+                    const finalCost = (rawCost * (exchangeRates[inputCurrency] || 1)) / (exchangeRates[tripCurrency] || 1);
 
                     const newExpense = {
                       ...(editingExpense || { id: 'exp-' + Date.now() }),
@@ -3884,7 +3902,7 @@
                     const rawCost = Number(formData.get('cost')) || 0;
                     const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
                     const tripCurrency = activeTrip.currency || 'COP';
-                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+                    const finalCost = (rawCost * (exchangeRates[inputCurrency] || 1)) / (exchangeRates[tripCurrency] || 1);
 
                     const newFlight = {
                       ...(editingFlight || { id: 'fl-' + Date.now() }),
@@ -3989,7 +4007,7 @@
                     const rawCost = Number(formData.get('cost')) || 0;
                     const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
                     const tripCurrency = activeTrip.currency || 'COP';
-                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+                    const finalCost = (rawCost * (exchangeRates[inputCurrency] || 1)) / (exchangeRates[tripCurrency] || 1);
 
                     const newStay = {
                       ...(editingStay || { id: 'stay-' + Date.now() }),
