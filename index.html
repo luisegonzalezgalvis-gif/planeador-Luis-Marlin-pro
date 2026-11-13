@@ -349,6 +349,13 @@
       { code: 'JPY', symbol: '¥', name: 'Yenes Japoneses (¥ JPY)' }
     ];
 
+    const EXCHANGE_RATES = {
+      COP: 1,
+      USD: 4050,
+      EUR: 4400,
+      JPY: 27
+    };
+
     // Helper para limpiar y normalizar enlaces de Google Maps
     function cleanMapUrl(rawUrl) {
       if (!rawUrl) return '';
@@ -501,8 +508,14 @@
       const [editingActivity, setEditingActivity] = useState(null);
 
       const [showExpenseModal, setShowExpenseModal] = useState(false);
+      const [editingExpense, setEditingExpense] = useState(null);
+      
       const [showFlightModal, setShowFlightModal] = useState(false);
+      const [editingFlight, setEditingFlight] = useState(null);
+      
       const [showStayModal, setShowStayModal] = useState(false);
+      const [editingStay, setEditingStay] = useState(null);
+      
       const [showAiModal, setShowAiModal] = useState(false);
       const [showCloudConfigModal, setShowCloudConfigModal] = useState(false);
       const [showQuickMapModal, setShowQuickMapModal] = useState(false);
@@ -1223,6 +1236,7 @@
                         <button
                           onClick={() => {
                             setSelectedDayIdForActivity(selectedCronogramaDayId !== 'overview' ? selectedCronogramaDayId : null);
+                            setEditingActivity(null);
                             setShowActivityModal(true);
                           }}
                           className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all active:scale-95 whitespace-nowrap shadow-md shadow-emerald-500/20"
@@ -1633,6 +1647,7 @@
                                 <button
                                   onClick={() => {
                                     setSelectedDayIdForActivity(selectedDay.id);
+                                    setEditingActivity(null);
                                     setShowActivityModal(true);
                                   }}
                                   className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl text-xs font-bold"
@@ -1698,9 +1713,16 @@
                                                 <span>Maps</span>
                                               </a>
 
-                                              <span className="font-mono font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-emerald-400">
-                                                {act.cost > 0 ? formatMoney(act.cost, activeTrip.currency) : 'Gratis'}
-                                              </span>
+                                              <div className="flex flex-col items-end">
+                                                <span className="font-mono font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-emerald-400">
+                                                  {act.cost > 0 ? formatMoney(act.cost, activeTrip.currency) : 'Gratis'}
+                                                </span>
+                                                {act.originalCurrency && act.originalCurrency !== activeTrip.currency && (
+                                                  <span className="text-[9px] text-slate-400">
+                                                    ({formatMoney(act.originalCost, act.originalCurrency)})
+                                                  </span>
+                                                )}
+                                              </div>
                                             </div>
                                           </div>
 
@@ -1740,7 +1762,7 @@
                                             <button
                                               onClick={() => {
                                                 setEditingActivity({ ...act, dayId: selectedDay.id });
-                                                setShowEditActivityModal(true);
+                                                setShowActivityModal(true);
                                               }}
                                               className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1 transition-colors font-semibold"
                                             >
@@ -1803,6 +1825,7 @@
                               <button
                                 onClick={() => {
                                   setSelectedDayIdForActivity(selectedDay.id);
+                                  setEditingActivity(null);
                                   setShowActivityModal(true);
                                 }}
                                 className="text-xs font-bold text-slate-950 bg-emerald-500 hover:bg-emerald-400 px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
@@ -2057,14 +2080,14 @@
 
                       <div className="flex flex-wrap gap-3 pt-2">
                         <button
-                          onClick={() => setShowExpenseModal(true)}
+                          onClick={() => { setEditingExpense(null); setShowExpenseModal(true); }}
                           className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
                         >
                           <IconPlus className="w-4 h-4" />
                           Registrar Gasto Directo
                         </button>
                         <button
-                          onClick={() => setShowActivityModal(true)}
+                          onClick={() => { setEditingActivity(null); setShowActivityModal(true); }}
                           className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border border-slate-700"
                         >
                           <IconTicket className="w-4 h-4 text-emerald-400" />
@@ -2088,7 +2111,7 @@
                       </div>
 
                       <button
-                        onClick={() => setShowFlightModal(true)}
+                        onClick={() => { setEditingFlight(null); setShowFlightModal(true); }}
                         className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
                       >
                         <IconPlus className="w-4 h-4" />
@@ -2110,9 +2133,16 @@
                                 <IconPlane className="w-4 h-4 text-cyan-400" />
                                 {fl.company}
                               </span>
-                              <span className="font-mono font-bold text-emerald-400 text-xs">
-                                {formatMoney(fl.cost, activeTrip.currency)}
-                              </span>
+                              <div className="flex flex-col items-end">
+                                <span className="font-mono font-bold text-emerald-400 text-xs">
+                                  {formatMoney(fl.cost, activeTrip.currency)}
+                                </span>
+                                {fl.originalCurrency && fl.originalCurrency !== activeTrip.currency && (
+                                  <span className="text-[9px] text-slate-400">
+                                    ({formatMoney(fl.originalCost, fl.originalCurrency)})
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             <div className="space-y-1 text-xs">
@@ -2131,17 +2161,28 @@
 
                             <div className="flex items-center justify-between pt-2">
                               <span className="text-[11px] text-slate-400 italic">{fl.notes}</span>
-                              <button
-                                onClick={() => {
-                                  const updatedTrip = { ...activeTrip, flights: activeTrip.flights.filter(f => f.id !== fl.id) };
-                                  const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                  updateTripsList(updatedList);
-                                  showToast("Vuelo eliminado.");
-                                }}
-                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
-                              >
-                                <IconTrash className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => {
+                                    setEditingFlight(fl);
+                                    setShowFlightModal(true);
+                                  }}
+                                  className="text-slate-500 hover:text-cyan-400 text-xs flex items-center gap-1 transition-colors"
+                                >
+                                  <IconPencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const updatedTrip = { ...activeTrip, flights: activeTrip.flights.filter(f => f.id !== fl.id) };
+                                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                    updateTripsList(updatedList);
+                                    showToast("Vuelo eliminado.");
+                                  }}
+                                  className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
+                                >
+                                  <IconTrash className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -2163,7 +2204,7 @@
                       </div>
 
                       <button
-                        onClick={() => setShowStayModal(true)}
+                        onClick={() => { setEditingStay(null); setShowStayModal(true); }}
                         className="flex items-center gap-2 bg-purple-500 hover:bg-purple-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
                       >
                         <IconPlus className="w-4 h-4" />
@@ -2190,9 +2231,16 @@
                             <div className="p-4 space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-bold uppercase text-purple-400">{st.city}</span>
-                                <span className="font-mono font-bold text-emerald-400 text-xs">
-                                  {formatMoney(st.cost, activeTrip.currency)}
-                                </span>
+                                <div className="flex flex-col items-end">
+                                  <span className="font-mono font-bold text-emerald-400 text-xs">
+                                    {formatMoney(st.cost, activeTrip.currency)}
+                                  </span>
+                                  {st.originalCurrency && st.originalCurrency !== activeTrip.currency && (
+                                    <span className="text-[9px] text-slate-400">
+                                      ({formatMoney(st.originalCost, st.originalCurrency)})
+                                    </span>
+                                  )}
+                                </div>
                               </div>
 
                               <h4 className="font-bold text-sm text-slate-100">{st.name}</h4>
@@ -2207,17 +2255,28 @@
                               <span className="text-[10px] font-mono text-slate-400">
                                 Confirmación: {st.confirmCode || 'N/A'}
                               </span>
-                              <button
-                                onClick={() => {
-                                  const updatedTrip = { ...activeTrip, stays: activeTrip.stays.filter(s => s.id !== st.id) };
-                                  const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                  updateTripsList(updatedList);
-                                  showToast("Alojamiento eliminado.");
-                                }}
-                                className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1"
-                              >
-                                <IconTrash className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => {
+                                    setEditingStay(st);
+                                    setShowStayModal(true);
+                                  }}
+                                  className="text-slate-500 hover:text-emerald-400 text-xs flex items-center gap-1 transition-colors"
+                                >
+                                  <IconPencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const updatedTrip = { ...activeTrip, stays: activeTrip.stays.filter(s => s.id !== st.id) };
+                                    const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                    updateTripsList(updatedList);
+                                    showToast("Alojamiento eliminado.");
+                                  }}
+                                  className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 transition-colors"
+                                >
+                                  <IconTrash className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -2239,7 +2298,7 @@
                       </div>
 
                       <button
-                        onClick={() => setShowExpenseModal(true)}
+                        onClick={() => { setEditingExpense(null); setShowExpenseModal(true); }}
                         className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95"
                       >
                         <IconPlus className="w-4 h-4" />
@@ -2280,20 +2339,38 @@
                                   </td>
                                   <td className="p-3 text-slate-400">{exp.date || 'N/A'}</td>
                                   <td className="p-3 text-right font-bold text-emerald-400">
-                                    {formatMoney(exp.cost, activeTrip.currency)}
+                                    <div className="flex flex-col items-end">
+                                      <span>{formatMoney(exp.cost, activeTrip.currency)}</span>
+                                      {exp.originalCurrency && exp.originalCurrency !== activeTrip.currency && (
+                                        <span className="text-[9px] text-slate-400 font-normal">
+                                          ({formatMoney(exp.originalCost, exp.originalCurrency)})
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="p-3 text-center">
-                                    <button
-                                      onClick={() => {
-                                        const updatedTrip = { ...activeTrip, expenses: activeTrip.expenses.filter(e => e.id !== exp.id) };
-                                        const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
-                                        updateTripsList(updatedList);
-                                        showToast("Gasto eliminado.");
-                                      }}
-                                      className="text-slate-500 hover:text-red-400 transition-colors"
-                                    >
-                                      <IconTrash className="w-3.5 h-3.5" />
-                                    </button>
+                                    <div className="flex items-center justify-center gap-3">
+                                      <button
+                                        onClick={() => {
+                                          setEditingExpense(exp);
+                                          setShowExpenseModal(true);
+                                        }}
+                                        className="text-slate-500 hover:text-cyan-400 transition-colors"
+                                      >
+                                        <IconPencil className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          const updatedTrip = { ...activeTrip, expenses: activeTrip.expenses.filter(e => e.id !== exp.id) };
+                                          const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
+                                          updateTripsList(updatedList);
+                                          showToast("Gasto eliminado.");
+                                        }}
+                                        className="text-slate-500 hover:text-red-400 transition-colors"
+                                      >
+                                        <IconTrash className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -3020,12 +3097,19 @@
                     const formData = new FormData(e.target);
                     const targetDayId = formData.get('dayId');
                     
+                    const rawCost = Number(formData.get('cost')) || 0;
+                    const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
+                    const tripCurrency = activeTrip.currency || 'COP';
+                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+
                     const newAct = {
                       id: 'act-' + Date.now(),
                       time: formData.get('time') || '',
                       title: formData.get('title'),
                       city: formData.get('city') || '',
-                      cost: Number(formData.get('cost')) || 0,
+                      cost: finalCost,
+                      originalCost: rawCost,
+                      originalCurrency: inputCurrency,
                       photo: formData.get('photo') || '',
                       notes: formData.get('notes') || ''
                     };
@@ -3091,13 +3175,19 @@
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-slate-400 block mb-1 font-medium">Costo ({activeTrip.currency})</label>
-                      <input
-                        type="number"
-                        name="cost"
-                        placeholder="0 si es gratis"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
-                      />
+                      <label className="text-slate-400 block mb-1 font-medium">Costo Estimado</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="any"
+                          name="cost"
+                          placeholder="0 si es gratis"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
+                        />
+                        <select name="inputCurrency" defaultValue={activeTrip.currency || 'COP'} className="bg-slate-950 border border-slate-800 rounded-xl px-2 text-slate-200 font-bold focus:outline-none">
+                          {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Foto del Lugar</label>
@@ -3177,12 +3267,19 @@
                     const formData = new FormData(e.target);
                     const targetDayId = formData.get('dayId');
                     
+                    const rawCost = Number(formData.get('cost')) || 0;
+                    const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
+                    const tripCurrency = activeTrip.currency || 'COP';
+                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+
                     const updatedAct = {
                       ...editingActivity,
                       time: formData.get('time') || '',
                       title: formData.get('title'),
                       city: formData.get('city') || '',
-                      cost: Number(formData.get('cost')) || 0,
+                      cost: finalCost,
+                      originalCost: rawCost,
+                      originalCurrency: inputCurrency,
                       photo: formData.get('photo') || '',
                       notes: formData.get('notes') || ''
                     };
@@ -3259,14 +3356,20 @@
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-slate-400 block mb-1 font-medium">Costo ({activeTrip.currency})</label>
-                      <input
-                        type="number"
-                        name="cost"
-                        defaultValue={editingActivity.cost}
-                        placeholder="0 si es gratis"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
-                      />
+                      <label className="text-slate-400 block mb-1 font-medium">Costo Estimado</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="any"
+                          name="cost"
+                          defaultValue={editingActivity.originalCost || editingActivity.cost || ''}
+                          placeholder="0 si es gratis"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
+                        />
+                        <select name="inputCurrency" defaultValue={editingActivity.originalCurrency || activeTrip.currency || 'COP'} className="bg-slate-950 border border-slate-800 rounded-xl px-2 text-slate-200 font-bold focus:outline-none">
+                          {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Foto del Lugar</label>
@@ -3328,7 +3431,7 @@
             </div>
           )}
 
-          {/* Modales de Viajes, Vuelos, Hoteles y Gastos */}
+          {/* Modales de Viajes */}
           {showEditTripModal && activeTrip && (
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -3642,8 +3745,8 @@
             <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="font-bold text-slate-100 text-base">Registrar Nuevo Gasto</h3>
-                  <button onClick={() => setShowExpenseModal(false)} className="text-slate-500 hover:text-slate-300">
+                  <h3 className="font-bold text-slate-100 text-base">{editingExpense ? 'Editar Gasto' : 'Registrar Nuevo Gasto'}</h3>
+                  <button onClick={() => { setShowExpenseModal(false); setEditingExpense(null); }} className="text-slate-500 hover:text-slate-300">
                     <IconX className="w-5 h-5" />
                   </button>
                 </div>
@@ -3652,20 +3755,36 @@
                   onSubmit={async (e) => {
                     e.preventDefault();
                     const formData = new FormData(e.target);
+                    
+                    const rawCost = Number(formData.get('cost')) || 0;
+                    const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
+                    const tripCurrency = activeTrip.currency || 'COP';
+                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+
                     const newExpense = {
-                      id: 'exp-' + Date.now(),
+                      ...(editingExpense || { id: 'exp-' + Date.now() }),
                       title: formData.get('title'),
                       category: formData.get('category'),
-                      cost: Number(formData.get('cost')) || 0,
+                      cost: finalCost,
+                      originalCost: rawCost,
+                      originalCurrency: inputCurrency,
                       date: formData.get('date')
                     };
 
-                    const updatedTrip = { ...activeTrip, expenses: [newExpense, ...(activeTrip.expenses || [])] };
+                    let newExpenses = activeTrip.expenses || [];
+                    if (editingExpense) {
+                      newExpenses = newExpenses.map(e => e.id === editingExpense.id ? newExpense : e);
+                    } else {
+                      newExpenses = [newExpense, ...newExpenses];
+                    }
+
+                    const updatedTrip = { ...activeTrip, expenses: newExpenses };
                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
                     updateTripsList(updatedList);
 
                     setShowExpenseModal(false);
-                    showToast("Gasto registrado.");
+                    setEditingExpense(null);
+                    showToast(editingExpense ? "Gasto actualizado." : "Gasto registrado.");
                   }}
                   className="space-y-4 text-xs"
                 >
@@ -3674,6 +3793,7 @@
                     <input
                       name="title"
                       required
+                      defaultValue={editingExpense?.title || ''}
                       placeholder="Ej: Pases de Metro / Almuerzo"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none"
                     />
@@ -3684,6 +3804,7 @@
                       <label className="text-slate-400 block mb-1 font-medium font-sans">Categoría</label>
                       <select
                         name="category"
+                        defaultValue={editingExpense?.category || CATEGORIES[6].id}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none"
                       >
                         {CATEGORIES.map(c => (
@@ -3693,15 +3814,21 @@
                     </div>
 
                     <div>
-                      <label className="text-slate-400 block mb-1 font-medium">Monto ({activeTrip.currency}) *</label>
-                      <input
-                        type="number"
-                        name="cost"
-                        step="0.01"
-                        required
-                        placeholder="50000"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
-                      />
+                      <label className="text-slate-400 block mb-1 font-medium">Monto *</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="any"
+                          name="cost"
+                          required
+                          defaultValue={editingExpense?.originalCost || editingExpense?.cost || ''}
+                          placeholder="50000"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
+                        />
+                        <select name="inputCurrency" defaultValue={editingExpense?.originalCurrency || activeTrip.currency || 'COP'} className="bg-slate-950 border border-slate-800 rounded-xl px-2 text-slate-200 font-bold focus:outline-none">
+                          {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -3710,6 +3837,7 @@
                     <input
                       type="date"
                       name="date"
+                      defaultValue={editingExpense?.date || ''}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -3717,7 +3845,7 @@
                   <div className="flex justify-end gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => setShowExpenseModal(false)}
+                      onClick={() => { setShowExpenseModal(false); setEditingExpense(null); }}
                       className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
                     >
                       Cancelar
@@ -3741,9 +3869,9 @@
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
                     <IconPlane className="w-5 h-5 text-cyan-400" />
-                    Registrar Vuelo
+                    {editingFlight ? 'Editar Vuelo' : 'Registrar Vuelo'}
                   </h3>
-                  <button onClick={() => setShowFlightModal(false)} className="text-slate-500 hover:text-slate-300">
+                  <button onClick={() => { setShowFlightModal(false); setEditingFlight(null); }} className="text-slate-500 hover:text-slate-300">
                     <IconX className="w-5 h-5" />
                   </button>
                 </div>
@@ -3752,65 +3880,86 @@
                   onSubmit={async (e) => {
                     e.preventDefault();
                     const formData = new FormData(e.target);
+
+                    const rawCost = Number(formData.get('cost')) || 0;
+                    const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
+                    const tripCurrency = activeTrip.currency || 'COP';
+                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+
                     const newFlight = {
-                      id: 'fl-' + Date.now(),
+                      ...(editingFlight || { id: 'fl-' + Date.now() }),
                       company: formData.get('company'),
                       route: formData.get('route'),
                       date: formData.get('date') || '',
                       time: formData.get('time') || '',
-                      cost: Number(formData.get('cost')) || 0,
+                      cost: finalCost,
+                      originalCost: rawCost,
+                      originalCurrency: inputCurrency,
                       bookingRef: formData.get('bookingRef') || '',
                       notes: formData.get('notes') || ''
                     };
 
-                    const updatedTrip = { ...activeTrip, flights: [newFlight, ...(activeTrip.flights || [])] };
+                    let newFlights = activeTrip.flights || [];
+                    if (editingFlight) {
+                      newFlights = newFlights.map(f => f.id === editingFlight.id ? newFlight : f);
+                    } else {
+                      newFlights = [newFlight, ...newFlights];
+                    }
+
+                    const updatedTrip = { ...activeTrip, flights: newFlights };
                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
                     updateTripsList(updatedList);
 
                     setShowFlightModal(false);
-                    showToast("Vuelo registrado correctamente.");
+                    setEditingFlight(null);
+                    showToast(editingFlight ? "Vuelo actualizado correctamente." : "Vuelo registrado correctamente.");
                   }}
                   className="space-y-4 text-xs"
                 >
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Aerolínea / Compañía *</label>
-                    <input name="company" required placeholder="Ej: Avianca / LATAM / Delta" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
+                    <input name="company" required defaultValue={editingFlight?.company || ''} placeholder="Ej: Avianca / LATAM / Delta" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
                   </div>
 
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Ruta / Trayecto *</label>
-                    <input name="route" required placeholder="Ej: Bogotá (BOG) -> New York (JFK)" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
+                    <input name="route" required defaultValue={editingFlight?.route || ''} placeholder="Ej: Bogotá (BOG) -> New York (JFK)" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Fecha del Vuelo</label>
-                      <input type="date" name="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
+                      <input type="date" name="date" defaultValue={editingFlight?.date || ''} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Hora de Salida / Abordaje</label>
-                      <input type="time" name="time" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
+                      <input type="time" name="time" defaultValue={editingFlight?.time || ''} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none" />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-slate-400 block mb-1 font-medium">Costo Total ({activeTrip.currency})</label>
-                      <input type="number" name="cost" placeholder="2500000" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none" />
+                      <label className="text-slate-400 block mb-1 font-medium">Costo Total *</label>
+                      <div className="flex gap-2">
+                        <input type="number" step="any" name="cost" required defaultValue={editingFlight?.originalCost || editingFlight?.cost || ''} placeholder="2500000" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none" />
+                        <select name="inputCurrency" defaultValue={editingFlight?.originalCurrency || activeTrip.currency || 'COP'} className="bg-slate-950 border border-slate-800 rounded-xl px-2 text-slate-200 font-bold focus:outline-none">
+                          {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Código de Reserva</label>
-                      <input name="bookingRef" placeholder="AV-9812 / 6 letras" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none uppercase font-mono" />
+                      <input name="bookingRef" defaultValue={editingFlight?.bookingRef || ''} placeholder="AV-9812 / 6 letras" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none uppercase font-mono" />
                     </div>
                   </div>
 
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Notas / Terminal / Equipaje</label>
-                    <textarea name="notes" rows="2" placeholder="Ej: Terminal 4, incluye maleta de 23kg..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none"></textarea>
+                    <textarea name="notes" rows="2" defaultValue={editingFlight?.notes || ''} placeholder="Ej: Terminal 4, incluye maleta de 23kg..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none"></textarea>
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                    <button type="button" onClick={() => setShowFlightModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold">Cancelar</button>
+                    <button type="button" onClick={() => { setShowFlightModal(false); setEditingFlight(null); }} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold">Cancelar</button>
                     <button type="submit" className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all">Guardar Vuelo</button>
                   </div>
                 </form>
@@ -3825,9 +3974,9 @@
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
                     <IconHotel className="w-5 h-5 text-purple-400" />
-                    Registrar Alojamiento / Hotel
+                    {editingStay ? 'Editar Alojamiento / Hotel' : 'Registrar Alojamiento / Hotel'}
                   </h3>
-                  <button onClick={() => setShowStayModal(false)} className="text-slate-500 hover:text-slate-300">
+                  <button onClick={() => { setShowStayModal(false); setEditingStay(null); }} className="text-slate-500 hover:text-slate-300">
                     <IconX className="w-5 h-5" />
                   </button>
                 </div>
@@ -3836,56 +3985,77 @@
                   onSubmit={async (e) => {
                     e.preventDefault();
                     const formData = new FormData(e.target);
+
+                    const rawCost = Number(formData.get('cost')) || 0;
+                    const inputCurrency = formData.get('inputCurrency') || activeTrip.currency || 'COP';
+                    const tripCurrency = activeTrip.currency || 'COP';
+                    const finalCost = (rawCost * (EXCHANGE_RATES[inputCurrency] || 1)) / (EXCHANGE_RATES[tripCurrency] || 1);
+
                     const newStay = {
-                      id: 'stay-' + Date.now(),
+                      ...(editingStay || { id: 'stay-' + Date.now() }),
                       name: formData.get('name'),
                       city: formData.get('city'),
                       checkIn: formData.get('checkIn') || '',
                       checkOut: formData.get('checkOut') || '',
-                      cost: Number(formData.get('cost')) || 0,
+                      cost: finalCost,
+                      originalCost: rawCost,
+                      originalCurrency: inputCurrency,
                       confirmCode: formData.get('confirmCode') || '',
                       image: formData.get('image') || '',
                       notes: formData.get('notes') || ''
                     };
 
-                    const updatedTrip = { ...activeTrip, stays: [newStay, ...(activeTrip.stays || [])] };
+                    let newStays = activeTrip.stays || [];
+                    if (editingStay) {
+                      newStays = newStays.map(s => s.id === editingStay.id ? newStay : s);
+                    } else {
+                      newStays = [newStay, ...newStays];
+                    }
+
+                    const updatedTrip = { ...activeTrip, stays: newStays };
                     const updatedList = trips.map(t => t.id === activeTrip.id ? updatedTrip : t);
                     updateTripsList(updatedList);
 
                     setShowStayModal(false);
-                    showToast("Alojamiento registrado correctamente.");
+                    setEditingStay(null);
+                    showToast(editingStay ? "Alojamiento actualizado correctamente." : "Alojamiento registrado correctamente.");
                   }}
                   className="space-y-4 text-xs"
                 >
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Nombre del Hotel / Alojamiento *</label>
-                    <input name="name" required placeholder="Ej: Manhattan Downtown Hotel" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
+                    <input name="name" required defaultValue={editingStay?.name || ''} placeholder="Ej: Manhattan Downtown Hotel" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
                   </div>
 
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Ciudad / Zona *</label>
-                    <input name="city" required placeholder="Ej: Nueva York (Midtown)" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
+                    <input name="city" required defaultValue={editingStay?.city || ''} placeholder="Ej: Nueva York (Midtown)" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Check-In</label>
-                      <input type="date" name="checkIn" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
+                      <input type="date" name="checkIn" defaultValue={editingStay?.checkIn || ''} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Check-Out</label>
-                      <input type="date" name="checkOut" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
+                      <input type="date" name="checkOut" defaultValue={editingStay?.checkOut || ''} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none" />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-purple-400 block mb-1 font-bold">Valor Pagado ({activeTrip.currency}) *</label>
-                      <input type="number" name="cost" required placeholder="3200000" className="w-full bg-slate-950 border border-purple-500/50 rounded-xl p-2.5 font-mono text-emerald-400 font-bold focus:border-purple-400 focus:outline-none" />
+                      <label className="text-purple-400 block mb-1 font-bold">Valor Pagado *</label>
+                      <div className="flex gap-2">
+                        <input type="number" step="any" name="cost" required defaultValue={editingStay?.originalCost || editingStay?.cost || ''} placeholder="3200000" className="w-full bg-slate-950 border border-purple-500/50 rounded-xl p-2.5 font-mono text-emerald-400 font-bold focus:border-purple-400 focus:outline-none" />
+                        <select name="inputCurrency" defaultValue={editingStay?.originalCurrency || activeTrip.currency || 'COP'} className="bg-slate-950 border border-purple-500/50 rounded-xl px-2 text-slate-200 font-bold focus:outline-none">
+                          {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label className="text-slate-400 block mb-1 font-medium">Código Confirmación</label>
-                      <input name="confirmCode" placeholder="Ej: BKG-88123" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none font-mono uppercase" />
+                      <input name="confirmCode" defaultValue={editingStay?.confirmCode || ''} placeholder="Ej: BKG-88123" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none font-mono uppercase" />
                     </div>
                   </div>
 
@@ -3909,17 +4079,17 @@
                           }}
                         />
                       </label>
-                      <input id="stay-image-input" name="image" placeholder="O pega URL de imagen https://..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-[11px] focus:border-purple-500 focus:outline-none" />
+                      <input id="stay-image-input" name="image" defaultValue={editingStay?.image || ''} placeholder="O pega URL de imagen https://..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-[11px] focus:border-purple-500 focus:outline-none" />
                     </div>
                   </div>
 
                   <div>
                     <label className="text-slate-400 block mb-1 font-medium">Notas / Tipo de Habitación / Desayuno</label>
-                    <textarea name="notes" rows="2" placeholder="Ej: Habitación King con vista, incluye desayuno tipo buffet..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none"></textarea>
+                    <textarea name="notes" rows="2" defaultValue={editingStay?.notes || ''} placeholder="Ej: Habitación King con vista, incluye desayuno tipo buffet..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-purple-500 focus:outline-none"></textarea>
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                    <button type="button" onClick={() => setShowStayModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold">Cancelar</button>
+                    <button type="button" onClick={() => { setShowStayModal(false); setEditingStay(null); }} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold">Cancelar</button>
                     <button type="submit" className="px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold transition-all">Guardar Hotel</button>
                   </div>
                 </form>
