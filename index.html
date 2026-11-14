@@ -289,6 +289,9 @@
     const IconBus = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
     );
+    const IconFerry = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 3.25-2 6-2s3.5 2 6 2c1.3 0 1.9-.5 2.5-1"/><path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76"/><path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6"/><path d="M12 10v4"/><path d="M12 2v3"/></svg>
+    );
     const IconHotel = ({ className = "w-5 h-5" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/><path d="M9 14h6"/><path d="M9 18h6"/><path d="M10 6h4"/><path d="M10 10h4"/></svg>
     );
@@ -2151,7 +2154,7 @@
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {activeTrip.flights.map(fl => {
-                          const TransportIcon = fl.type === 'tren' ? IconTrain : fl.type === 'bus' ? IconBus : IconPlane;
+                          const TransportIcon = fl.type === 'tren' ? IconTrain : fl.type === 'bus' ? IconBus : fl.type === 'ferry' ? IconFerry : IconPlane;
                           return (
                             <div key={fl.id} className="glass-card p-5 rounded-2xl space-y-3 relative">
                               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
@@ -3975,6 +3978,7 @@
                         <option value="vuelo">✈️ Vuelo</option>
                         <option value="tren">🚆 Tren</option>
                         <option value="bus">🚌 Bus</option>
+                        <option value="ferry">🛳️ Ferry / Barco</option>
                       </select>
                     </div>
                     <div>
